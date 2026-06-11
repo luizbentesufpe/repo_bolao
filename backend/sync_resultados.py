@@ -4,13 +4,14 @@ Sincroniza resultados da Copa 2026 da API football-data.org
 Uso: python sync_resultados.py
 """
 
+import os
 from datetime import datetime
 
 import requests
 from app import app
 from models import Jogo, Time, db
 
-API_KEY = "seu_api_key_aqui"
+API_KEY = os.getenv("FOOTBALL_DATA_API_KEY", "")
 BASE_URL = "https://api.football-data.org/v4"
 TOURNAMENT_CODE = "WC"
 
