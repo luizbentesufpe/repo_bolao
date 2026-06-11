@@ -76,7 +76,7 @@ import { BandeiraPipe } from '../core/bandeiras.pipe';
                 }
 
                 <!-- BOTAO APOSTE AQUI -->
-                @if (!jogo.comecou && !jogo.encerrado) {
+                @if (estaAberto(jogo)) {
                   <button class="btn btn-amarelo" (click)="abrirAposta(jogo)" 
                           style="font-size:12px; padding:6px 10px; margin-left:auto;">
                     {{ jogo.minha_aposta ? '✏️ Editar' : '🎯 Aposte aqui' }}
@@ -254,9 +254,11 @@ export class JogosComponent implements OnInit, OnDestroy {
 
   ngOnInit() {
     this.filtrar('hoje');
+    // Recarrega dados a cada 5 segundos para atualizar status dos jogos
     this.intervaloAtualizacao = setInterval(() => {
       this.tempos.clear();
-    }, 1000);
+      this.filtrar(this.periodo);
+    }, 5000);
   }
 
   ngOnDestroy() {
@@ -285,7 +287,6 @@ export class JogosComponent implements OnInit, OnDestroy {
         
         if (!mapa.has(chave)) mapa.set(chave, { ativos: [], encerrados: [] });
         
-        // ✅ Usa status_api do backend (FINISHED = encerrado)
         if (j.encerrado) {
           mapa.get(chave)!.encerrados.push(j);
         } else {
@@ -328,6 +329,13 @@ export class JogosComponent implements OnInit, OnDestroy {
     return `${segundos}s`;
   }
 
+  estaAberto(jogo: Jogo): boolean {
+    // Calcula dinamicamente se o jogo ainda está aberto para apostas
+    const agora = new Date().getTime();
+    const inicio = new Date(jogo.data_hora).getTime();
+    return agora < inicio;
+  }
+
   abrirAposta(jogo: Jogo) {
     this.jogoEmEdicao = jogo;
     this.palpite1 = jogo.minha_aposta?.gols_time1 ?? null;
@@ -342,6 +350,13 @@ export class JogosComponent implements OnInit, OnDestroy {
 
   confirmarAposta(jogo: Jogo) {
     if (this.palpite1 === null || this.palpite2 === null) return;
+    
+    // Valida se o jogo ainda está aberto
+    if (!this.estaAberto(jogo)) {
+      alert('Apostas encerradas: o jogo já começou.');
+      this.cancelarAposta();
+      return;
+    }
     
     this.api.salvarAposta(jogo.id, this.palpite1, this.palpite2).subscribe({
       next: aposta => {

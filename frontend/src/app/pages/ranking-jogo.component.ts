@@ -250,8 +250,8 @@ export class RankingJogoComponent implements OnInit, OnDestroy {
   jogosFiltrados: Jogo[] = [];
   detalhe: ApostasDoJogo | null = null;
   meuEmail = '';
-  filtro: 'todos' | 'encerrado' | 'ao-vivo' | 'em-breve' = 'todos';
-  periodo: 'hoje' | 'semana' | 'todos' = 'todos';
+  filtro: 'todos' | 'encerrado' | 'ao-vivo' | 'em-breve' = 'em-breve'; 
+  periodo: 'hoje' | 'semana' | 'todos' = 'hoje'; 
   diasAgrupados: { chave: string; data: Date; jogos: Jogo[] }[] = [];
   usuariosMeusPalpites: { [key: number]: any } = {};
   jogoComPalpitesAberto: number | null = null;
@@ -263,7 +263,7 @@ export class RankingJogoComponent implements OnInit, OnDestroy {
 
   ngOnInit() {
     this.carregarDados();
-    this.atualizarLista();  // ✅ ADICIONE
+    this.atualizarLista();
     this.intervaloAtualizacao = setInterval(() => this.carregarDados(), 10000);
   }
 
