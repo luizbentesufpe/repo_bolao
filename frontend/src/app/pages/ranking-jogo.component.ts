@@ -241,7 +241,7 @@ import { BandeiraPipe } from '../core/bandeiras.pipe';
   `,
   styles: [`
     .jogo-card {
-      min-height: 100px;
+      min-height: 120px;
     }
   `]
 })
