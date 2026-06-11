@@ -40,9 +40,7 @@ CORS(
     app,
     resources={
         r"/api/*": {
-            "origins": [
-                "https://bolao-web-0s5h.onrender.com"
-            ],
+            "origins": ["https://bolao-web-0s5h.onrender.com"],
             "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
             "allow_headers": ["Content-Type", "Authorization"],
         }
@@ -114,16 +112,24 @@ def listar_jogos():
     from sync_resultados import sincronizar_resultados
 
     agora = datetime.now()
-    
+
     # Sincroniza apenas se passou INTERVALO_SYNC minutos desde o último sync
-    if ultimo_sync is None or (agora - ultimo_sync).total_seconds() > INTERVALO_SYNC * 60:
-        print(f"[{agora.strftime('%H:%M:%S')}] 🔄 Sincronizando placares...", flush=True)
+    if (
+        ultimo_sync is None
+        or (agora - ultimo_sync).total_seconds() > INTERVALO_SYNC * 60
+    ):
+        print(
+            f"[{agora.strftime('%H:%M:%S')}] 🔄 Sincronizando placares...", flush=True
+        )
         sincronizar_resultados(app=app, verbose=False, status_filter="IN_PLAY")
         ultimo_sync = agora
         print(f"[{agora.strftime('%H:%M:%S')}] ✅ Sincronização concluída!", flush=True)
     else:
         tempo_restante = INTERVALO_SYNC * 60 - (agora - ultimo_sync).total_seconds()
-        print(f"[{agora.strftime('%H:%M:%S')}] ⏳ Cache ativo (próximo sync em {int(tempo_restante)}s)", flush=True)
+        print(
+            f"[{agora.strftime('%H:%M:%S')}] ⏳ Cache ativo (próximo sync em {int(tempo_restante)}s)",
+            flush=True,
+        )
 
     query = Jogo.query.order_by(Jogo.data_hora)
 
@@ -197,7 +203,6 @@ def ranking():
     """Mais acertos: pontos totais, placares exatos e apostas pontuadas."""
     tabela = {}
 
-    # Buscar TODAS as apostas (não só as com resultado)
     for aposta in Aposta.query.all():
         jogo = aposta.jogo
 
@@ -209,6 +214,7 @@ def ranking():
                 "exatos": 0,
                 "acertos": 0,
                 "apostas": 0,
+                "apostas_pontuadas": 0,  # ✅ Adicione
             },
         )
 
@@ -222,6 +228,9 @@ def ranking():
                 item["exatos"] += 1
             if pts > 0:
                 item["acertos"] += 1
+                item["apostas_pontuadas"] += 1  # ✅ Conte aqui
+
+    # ... resto do código ...
 
     saida = sorted(
         tabela.values(), key=lambda i: (i["pontos"], i["exatos"]), reverse=True
