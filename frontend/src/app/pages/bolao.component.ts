@@ -94,8 +94,8 @@ export class BolaoComponent implements OnInit, OnDestroy {
 
   ngOnInit() {
     this.carregarJogos();
-    // Recarrega a cada 5 segundos para atualizar o status dos jogos
-    this.intervaloAtualizacao = setInterval(() => this.carregarJogos(), 5000);
+    // Recarrega a cada 60 segundos para atualizar o status dos jogos
+    this.intervaloAtualizacao = setInterval(() => this.carregarJogos(), 60000);
   }
 
   ngOnDestroy() {

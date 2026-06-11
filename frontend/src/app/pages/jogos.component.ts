@@ -258,7 +258,7 @@ export class JogosComponent implements OnInit, OnDestroy {
     this.intervaloAtualizacao = setInterval(() => {
       this.tempos.clear();
       this.filtrar(this.periodo);
-    }, 5000);
+    }, 60000);
   }
 
   ngOnDestroy() {
