@@ -29,7 +29,7 @@ BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 
 app.config["SQLALCHEMY_DATABASE_URI"] = \
     f"sqlite:///{os.path.join(BASE_DIR, 'bolao.db')}"
-app.config["JWT_SECRET_KEY"] = "bolao_da_familia_martins"
+app.config['JWT_SECRET_KEY'] = os.getenv('JWT_SECRET_KEY', 'chave-desenvolvimento-insegura')
 app.config["JWT_ACCESS_TOKEN_EXPIRES"] = timedelta(days=7)
 
 db.init_app(app)
