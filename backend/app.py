@@ -138,19 +138,14 @@ def listar_jogos():
 def apostas_do_jogo(jogo_id):
     """Resultado do bolao por jogo: todas as apostas + pontos de cada um."""
     jogo = Jogo.query.get_or_404(jogo_id)
-    if not jogo.comecou:
-        # apostas dos outros so ficam visiveis depois que a bola rola
-        return jsonify({"jogo": jogo.to_dict(), "apostas": [], "liberado": False})
 
     apostas = sorted(jogo.apostas, key=lambda a: a.pontos(), reverse=True)
     return jsonify(
         {
             "jogo": jogo.to_dict(),
-            "liberado": True,
             "apostas": [a.to_dict(com_user=True) for a in apostas],
         }
     )
-
 
 # ------------------------------------------------------------------- APOSTAS
 @app.post("/api/apostas")
