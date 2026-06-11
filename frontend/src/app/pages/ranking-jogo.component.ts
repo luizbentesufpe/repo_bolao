@@ -113,6 +113,17 @@ import { BandeiraPipe } from '../core/bandeiras.pipe';
                 Palpites - {{ detalhe.jogo.time1.nome }} × {{ detalhe.jogo.time2.nome }}
               </h3>
               
+              <!-- STATUS DO JOGO -->
+              <div style="text-align: center; margin-bottom: 16px;">
+                @if (detalhe.jogo.encerrado) {
+                  <span style="background: var(--campo); color: white; padding: 6px 12px; border-radius: 999px; font-size: 12px; font-weight: 700; text-transform: uppercase; display: inline-block;">✓ Encerrado</span>
+                } @else if (detalhe.jogo.comecou) {
+                  <span style="background: var(--vermelho); color: white; padding: 6px 12px; border-radius: 999px; font-size: 12px; font-weight: 700; text-transform: uppercase; display: inline-block;">⚽ Ao vivo</span>
+                } @else {
+                  <span style="background: #999; color: white; padding: 6px 12px; border-radius: 999px; font-size: 12px; font-weight: 700; text-transform: uppercase; display: inline-block;">📅 Em breve</span>
+                }
+              </div>
+              
               @if (detalhe.jogo.encerrado) {
                 <div style="background: var(--campo); color: white; padding: 8px 12px; border-radius: 6px; margin-bottom: 16px; text-align: center; font-weight: 700;">
                   🏆 Resultado: {{ detalhe.jogo.gols_time1 }} × {{ detalhe.jogo.gols_time2 }}
@@ -170,73 +181,6 @@ import { BandeiraPipe } from '../core/bandeiras.pipe';
           </div>
         </div>
       }
-
-      <!-- DETALHE DO JOGO SELECIONADO (FORA DO @for) -->
-      @if (detalhe) {
-        <div style="margin-top: 40px; padding-top: 28px; border-top: 2px solid var(--linha);">
-          <h2 style="font-family: var(--fonte-display); margin-bottom: 20px; text-align: center;">Ranking</h2>
-
-          <!-- STATUS -->
-          <div style="text-align: center; margin-bottom: 20px;">
-            @if (detalhe.jogo.encerrado) {
-              <span style="background: var(--campo); color: white; padding: 6px 12px; border-radius: 999px; font-size: 12px; font-weight: 700; text-transform: uppercase;">✓ Encerrado</span>
-            } @else if (detalhe.jogo.comecou) {
-              <span style="background: var(--vermelho); color: white; padding: 6px 12px; border-radius: 999px; font-size: 12px; font-weight: 700; text-transform: uppercase;">⚽ Ao vivo</span>
-            } @else {
-              <span style="background: #999; color: white; padding: 6px 12px; border-radius: 999px; font-size: 12px; font-weight: 700; text-transform: uppercase;">📅 Em breve</span>
-            }
-          </div>
-
-          <!-- TABELA DO RANKING -->
-          @if (detalhe.apostas.length === 0) {
-            <p class="vazio">Ninguém apostou neste jogo.</p>
-          } @else {
-            <table class="tabela">
-              <thead>
-                <tr>
-                  <th style="width: 50px;">#</th>
-                  <th>Participante</th>
-                  <th style="width: 120px;">Palpite</th>
-                  @if (detalhe.jogo.encerrado) {
-                    <th style="width: 80px;">Pontos</th>
-                  }
-                </tr>
-              </thead>
-              <tbody>
-                @for (aposta of detalhe.apostas; track aposta.id; let idx = $index) {
-                  <tr [class.eu]="aposta.email === meuEmail" [class.pos-1]="idx === 0 && detalhe.jogo.encerrado">
-                    <td class="num" style="font-size: 18px; font-weight: 700;">
-                      @if (detalhe.jogo.encerrado) {
-                        @if (idx === 0) { 🥇 } 
-                        @else if (idx === 1) { 🥈 } 
-                        @else if (idx === 2) { 🥉 } 
-                        @else { {{ idx + 1 }} }
-                      }
-                    </td>
-                    <td>
-                      <strong>{{ aposta.nome }}</strong>
-                      @if (aposta.email === meuEmail) {
-                        <span style="color: var(--campo); font-size: 12px;">(você)</span>
-                      }
-                    </td>
-                    <td class="num" style="font-family: var(--fonte-placar); font-weight: 700; font-size: 16px;">
-                      <span [style.color]="detalhe.jogo.encerrado && aposta.gols_time1 === detalhe.jogo.gols_time1 && aposta.gols_time2 === detalhe.jogo.gols_time2 ? 'var(--campo)' : ''">
-                        {{ aposta.gols_time1 }}×{{ aposta.gols_time2 }}
-                      </span>
-                      @if (detalhe.jogo.encerrado && aposta.gols_time1 === detalhe.jogo.gols_time1 && aposta.gols_time2 === detalhe.jogo.gols_time2) {
-                        <span style="color: var(--campo); margin-left: 6px; font-weight: 700;">✓</span>
-                      }
-                    </td>
-                    @if (detalhe.jogo.encerrado) {
-                      <td class="num" style="font-weight: 700; background: #fff8e1; border-radius: 4px;">{{ aposta.pontos }}</td>
-                    }
-                  </tr>
-                }
-              </tbody>
-            </table>
-          }
-        </div>
-      }
     </main>
   `,
   styles: [`
@@ -255,7 +199,6 @@ export class RankingJogoComponent implements OnInit, OnDestroy {
   diasAgrupados: { chave: string; data: Date; jogos: Jogo[] }[] = [];
   usuariosMeusPalpites: { [key: number]: any } = {};
   jogoComPalpitesAberto: number | null = null;
-  private intervaloAtualizacao: any;
 
   constructor(private api: ApiService, auth: AuthService) {
     this.meuEmail = auth.usuario()?.email ?? '';
@@ -266,11 +209,7 @@ export class RankingJogoComponent implements OnInit, OnDestroy {
     this.atualizarLista();
   }
 
-  ngOnDestroy() {
-    if (this.intervaloAtualizacao) {
-      clearInterval(this.intervaloAtualizacao);
-    }
-  }
+  ngOnDestroy() {}
 
   atualizarLista() {
     let jogos = this.jogos;
