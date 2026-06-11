@@ -5,14 +5,14 @@ durante a Copa 2026 (11 de junho a 12 de julho de 2026).
 """
 from datetime import datetime
 from apscheduler.schedulers.background import BackgroundScheduler
-from sync_resultados import sincronizar_resultados
+
 
 scheduler = BackgroundScheduler()
 
 
 def iniciar_scheduler():
     """Inicia o scheduler de sincronização."""
-    
+    from sync_resultados import sincronizar_resultados
     # Data de início e fim da Copa 2026
     DATA_INICIO = datetime(2026, 6, 11)
     DATA_FIM = datetime(2026, 7, 12)
