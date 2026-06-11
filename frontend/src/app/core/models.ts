@@ -23,7 +23,8 @@ export interface Aposta {
   gols_time1: number | null;
   gols_time2: number | null;
   pontos: number;
-  username?: string;
+  email?: string;
+  nome?: string;
 }
 
 export interface ApostasDoJogo { jogo: Jogo; liberado: boolean; apostas: Aposta[]; }
