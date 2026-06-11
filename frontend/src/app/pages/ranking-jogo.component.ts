@@ -239,6 +239,11 @@ import { BandeiraPipe } from '../core/bandeiras.pipe';
       }
     </main>
   `,
+  styles: [`
+    .jogo-card {
+      min-height: 100px;
+    }
+  `]
 })
 export class RankingJogoComponent implements OnInit, OnDestroy {
   jogos: Jogo[] = [];

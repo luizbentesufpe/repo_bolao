@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, OnDestroy } from '@angular/core';
 import { DatePipe, CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ApiService } from '../core/api.service';
@@ -26,94 +26,181 @@ import { BandeiraPipe } from '../core/bandeiras.pipe';
       }
 
       @for (dia of dias; track dia.chave) {
-        <div class="dia-grupo"><span class="rotulo">{{ dia.data | date:'EEEE, d \\'de\\' MMMM' }}</span></div>
+        <!-- JOGOS ATIVOS -->
+        @if (dia.jogosAtivos.length > 0) {
+          <div class="dia-grupo"><span class="rotulo">{{ dia.data | date:'EEEE, d \\'de\\' MMMM' }}</span></div>
+          @for (jogo of dia.jogosAtivos; track jogo.id) {
+            <article class="jogo-card">
+              <div class="jogo-time">
+                <img [src]="jogo.time1.nome | bandeira" [alt]="jogo.time1.nome" 
+                     style="width: 32px; height: 24px; margin-right: 8px;">
+                {{ jogo.time1.nome }}
+              </div>
 
-        @for (jogo of dia.jogos; track jogo.id) {
-          <article class="jogo-card">
-            <div class="jogo-time">
-              <img [src]="jogo.time1.nome | bandeira" [alt]="jogo.time1.nome" 
-                   style="width: 32px; height: 24px; margin-right: 8px;">
-              {{ jogo.time1.nome }}
-            </div>
+              <div class="placar">
+                <span class="digito" [class.vazio]="jogo.gols_time1 === null">{{ jogo.gols_time1 ?? '–' }}</span>
+                <span class="x">×</span>
+                <span class="digito" [class.vazio]="jogo.gols_time2 === null">{{ jogo.gols_time2 ?? '–' }}</span>
+              </div>
 
-            <div class="placar">
-              <span class="digito" [class.vazio]="jogo.gols_time1 === null">{{ jogo.gols_time1 ?? '–' }}</span>
-              <span class="x">×</span>
-              <span class="digito" [class.vazio]="jogo.gols_time2 === null">{{ jogo.gols_time2 ?? '–' }}</span>
-            </div>
+              <div class="jogo-time dir">
+                {{ jogo.time2.nome }}
+                <img [src]="jogo.time2.nome | bandeira" [alt]="jogo.time2.nome" 
+                     style="width: 32px; height: 24px; margin-left: 8px;">
+              </div>
 
-            <div class="jogo-time dir">
-              {{ jogo.time2.nome }}
-              <img [src]="jogo.time2.nome | bandeira" [alt]="jogo.time2.nome" 
-                   style="width: 32px; height: 24px; margin-left: 8px;">
-            </div>
+              <div class="jogo-meta">
+                @if (ehHoje(jogo)) { <span class="tag-hoje">Hoje</span> }
+                <span>{{ jogo.data_hora | date:'HH:mm' }}</span>
+                
+                <!-- CRONOMETRO -->
+                @if (!jogo.comecou) {
+                  <span style="font-weight: 700; color: var(--amarelo);">
+                    {{ formatarTempo(getTempo(jogo)) }}
+                  </span>
+                } @else if (!jogo.encerrado) {
+                  <span style="color: var(--vermelho); font-weight: 700;">⚽ AO VIVO</span>
+                }
 
-            <div class="jogo-meta">
-              @if (ehHoje(jogo)) { <span class="tag-hoje">Hoje</span> }
-              <span>{{ jogo.data_hora | date:'HH:mm' }}</span>
-              
-              <!-- CRONOMETRO -->
-              @if (!jogo.comecou) {
-                <span style="font-weight: 700; color: var(--amarelo);">
-                  {{ formatarTempo(getTempo(jogo)) }}
-                </span>
-              } @else if (!jogo.encerrado) {
-                <span style="color: var(--vermelho); font-weight: 700;">⚽ AO VIVO</span>
-              }
+                <span>{{ jogo.estadio }}</span>
 
-              <span>{{ jogo.estadio }}</span>
+                @if (jogo.minha_aposta && jogo.minha_aposta.gols_time1 !== null && jogo.minha_aposta.gols_time2 !== null) { 
+                  <span class="pontos-chip" [class.cheio]="jogo.encerrado && jogo.minha_aposta.pontos > 0">
+                    {{ jogo.minha_aposta.gols_time1 }}×{{ jogo.minha_aposta.gols_time2 }}
+                    @if (jogo.encerrado) { · {{ jogo.minha_aposta.pontos }} pts }
+                  </span>
+                } @else {
+                  <span style="font-size: 12px; color: #999; padding: 4px 8px;">
+                    ⊘ Sem aposta
+                  </span>
+                }
 
-              @if (jogo.minha_aposta && jogo.minha_aposta.gols_time1 !== null && jogo.minha_aposta.gols_time2 !== null) { 
-                <span class="pontos-chip" [class.cheio]="jogo.encerrado && jogo.minha_aposta.pontos > 0">
-                  {{ jogo.minha_aposta.gols_time1 }}×{{ jogo.minha_aposta.gols_time2 }}
-                  @if (jogo.encerrado) { · {{ jogo.minha_aposta.pontos }} pts }
-                </span>
-              } @else {
-                <span style="font-size: 12px; color: #999; padding: 4px 8px;">
-                  ⊘ Sem aposta
-                </span>
-              }
+                <!-- BOTAO APOSTE AQUI -->
+                @if (!jogo.comecou && !jogo.encerrado) {
+                  <button class="btn btn-amarelo" (click)="abrirAposta(jogo)" 
+                          style="font-size:12px; padding:6px 10px; margin-left:auto;">
+                    {{ jogo.minha_aposta ? '✏️ Editar' : '🎯 Aposte aqui' }}
+                  </button>
+                }
+              </div>
 
-              <!-- BOTAO APOSTE AQUI -->
-              @if (!jogo.comecou && !jogo.encerrado) {
-                <button class="btn btn-amarelo" (click)="abrirAposta(jogo)" 
-                        style="font-size:12px; padding:6px 10px; margin-left:auto;">
-                  {{ jogo.minha_aposta ? '✏️ Editar' : '🎯 Aposte aqui' }}
-                </button>
-              }
-            </div>
-
-            <!-- MODAL DE APOSTA INLINE -->
-            @if (jogoEmEdicao?.id === jogo.id) {
-              <div class="modal-aposta">
-                <div class="modal-conteudo">
-                  <h3>Seu palpite</h3>
-                  <div style="display: grid; grid-template-columns: 1fr auto 1fr; gap: 10px; align-items: center; margin: 12px 0;">
-                    <input type="number" min="0" max="99" [(ngModel)]="palpite1" 
-                           placeholder="Gols" style="text-align: center; font-weight: 700;">
-                    <span style="font-weight: 700; font-size: 18px;">×</span>
-                    <input type="number" min="0" max="99" [(ngModel)]="palpite2" 
-                           placeholder="Gols" style="text-align: center; font-weight: 700;">
-                  </div>
-                  <div style="display: flex; gap: 8px; justify-content: flex-end;">
-                    <button class="btn" (click)="cancelarAposta()" style="background: #b9cdbe; font-size: 12px;">
-                      Cancelar
-                    </button>
-                    <button class="btn btn-amarelo" (click)="confirmarAposta(jogo)" 
-                            [disabled]="palpite1 === null || palpite2 === null" 
-                            style="font-size: 12px;">
-                      Confirmar
-                    </button>
+              <!-- MODAL DE APOSTA INLINE -->
+              @if (jogoEmEdicao?.id === jogo.id) {
+                <div class="modal-aposta">
+                  <div class="modal-conteudo">
+                    <h3>Seu palpite</h3>
+                    <div style="display: grid; grid-template-columns: 1fr auto 1fr; gap: 10px; align-items: center; margin: 12px 0;">
+                      <input type="number" min="0" max="99" [(ngModel)]="palpite1" 
+                             placeholder="Gols" style="text-align: center; font-weight: 700;">
+                      <span style="font-weight: 700; font-size: 18px;">×</span>
+                      <input type="number" min="0" max="99" [(ngModel)]="palpite2" 
+                             placeholder="Gols" style="text-align: center; font-weight: 700;">
+                    </div>
+                    <div style="display: flex; gap: 8px; justify-content: flex-end;">
+                      <button class="btn" (click)="cancelarAposta()" style="background: #b9cdbe; font-size: 12px;">
+                        Cancelar
+                      </button>
+                      <button class="btn btn-amarelo" (click)="confirmarAposta(jogo)" 
+                              [disabled]="palpite1 === null || palpite2 === null" 
+                              style="font-size: 12px;">
+                        Confirmar
+                      </button>
+                    </div>
                   </div>
                 </div>
+              }
+            </article>
+          }
+        }
+
+        <!-- JOGOS ENCERRADOS (CORTINA) -->
+        @if (dia.jogosEncerrados.length > 0) {
+          <div class="cortina-encerrados">
+            <button class="btn-cortina" (click)="dia.expandido = !dia.expandido">
+              {{ dia.expandido ? '▼' : '▶' }} 🏁 {{ dia.jogosEncerrados.length }} jogo(s) encerrado(s)
+            </button>
+
+            @if (dia.expandido) {
+              <div class="jogos-expandidos">
+                @for (jogo of dia.jogosEncerrados; track jogo.id) {
+                  <article class="jogo-card encerrado">
+                    <div class="jogo-time">
+                      <img [src]="jogo.time1.nome | bandeira" [alt]="jogo.time1.nome" 
+                           style="width: 32px; height: 24px; margin-right: 8px;">
+                      {{ jogo.time1.nome }}
+                    </div>
+
+                    <div class="placar">
+                      <span class="digito">{{ jogo.gols_time1 }}</span>
+                      <span class="x">×</span>
+                      <span class="digito">{{ jogo.gols_time2 }}</span>
+                    </div>
+
+                    <div class="jogo-time dir">
+                      {{ jogo.time2.nome }}
+                      <img [src]="jogo.time2.nome | bandeira" [alt]="jogo.time2.nome" 
+                           style="width: 32px; height: 24px; margin-left: 8px;">
+                    </div>
+
+                    <div class="jogo-meta">
+                      <span style="font-size: 12px; color: #999;">{{ jogo.data_hora | date:'HH:mm' }}</span>
+
+                      @if (jogo.minha_aposta && jogo.minha_aposta.gols_time1 !== null && jogo.minha_aposta.gols_time2 !== null) { 
+                        <span class="pontos-chip" [class.cheio]="jogo.minha_aposta.pontos > 0">
+                          {{ jogo.minha_aposta.gols_time1 }}×{{ jogo.minha_aposta.gols_time2 }}
+                          · {{ jogo.minha_aposta.pontos }} pts
+                        </span>
+                      }
+                    </div>
+                  </article>
+                }
               </div>
             }
-          </article>
+          </div>
         }
       }
     </main>
   `,
   styles: [`
+    .cortina-encerrados {
+      margin: 20px 0;
+      border-top: 2px dashed #ddd;
+      padding-top: 16px;
+    }
+    .btn-cortina {
+      width: 100%;
+      padding: 12px 16px;
+      background: #f5f5f5;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      font-weight: 600;
+      color: #666;
+      cursor: pointer;
+      font-size: 14px;
+      transition: all 0.2s ease;
+    }
+    .btn-cortina:hover {
+      background: #eee;
+    }
+    .jogos-expandidos {
+      margin-top: 12px;
+      animation: expandDown 0.3s ease-out;
+    }
+    @keyframes expandDown {
+      from {
+        opacity: 0;
+        max-height: 0;
+        overflow: hidden;
+      }
+      to {
+        opacity: 1;
+        max-height: 5000px;
+      }
+    }
+    .jogo-card.encerrado {
+      opacity: 0.7;
+      background: #fafafa;
+    }
     .modal-aposta {
       grid-column: 1 / -1;
       background: #fff8e1;
@@ -146,9 +233,15 @@ import { BandeiraPipe } from '../core/bandeiras.pipe';
     }
   `]
 })
-export class JogosComponent implements OnInit {
+export class JogosComponent implements OnInit, OnDestroy {
   periodo: 'hoje' | 'semana' | 'todos' = 'hoje';
-  dias: { chave: string; data: string; jogos: Jogo[] }[] = [];
+  dias: { 
+    chave: string; 
+    data: string; 
+    jogosAtivos: Jogo[];
+    jogosEncerrados: Jogo[];
+    expandido: boolean;
+  }[] = [];
   carregando = true;
   
   jogoEmEdicao: Jogo | null = null;
@@ -156,12 +249,12 @@ export class JogosComponent implements OnInit {
   palpite2: number | null = null;
   tempos = new Map<number, string>();
   private intervaloAtualizacao: any;
+  private TEMPO_ENCERRADO = 10800000; // 2.5 minutos em ms
 
   constructor(private api: ApiService) {}
 
   ngOnInit() {
     this.filtrar('hoje');
-    // Atualizar cronômetros a cada segundo
     this.intervaloAtualizacao = setInterval(() => {
       this.tempos.clear();
     }, 1000);
@@ -171,31 +264,48 @@ export class JogosComponent implements OnInit {
     clearInterval(this.intervaloAtualizacao);
   }
 
-filtrar(periodo: 'hoje' | 'semana' | 'todos') {
+  filtrar(periodo: 'hoje' | 'semana' | 'todos') {
     this.periodo = periodo;
     this.carregando = true;
-    // Sempre pede TODOS, filtra no front pelo timezone do navegador
     this.api.jogos('todos').subscribe(jogos => {
       const agora = new Date();
       const hoje00h = new Date(agora.getFullYear(), agora.getMonth(), agora.getDate());
       const hoje23h59 = new Date(hoje00h.getTime() + 86400000 - 1);
       const semana00h = new Date(hoje00h.getTime() + 604800000);
 
-      const mapa = new Map<string, Jogo[]>();
+      const mapa = new Map<string, { ativos: Jogo[], encerrados: Jogo[] }>();
+      
       for (const j of jogos) {
         const dataLocal = new Date(j.data_hora);
 
-        // Filtrar pelo periodo escolhido
         if (periodo === 'hoje' && (dataLocal < hoje00h || dataLocal > hoje23h59)) continue;
         if (periodo === 'semana' && dataLocal > semana00h) continue;
 
         const chave = dataLocal.toLocaleDateString('pt-BR')
           .split('/').reverse().join('-');
-        if (!mapa.has(chave)) mapa.set(chave, []);
-        mapa.get(chave)!.push(j);
+        
+        if (!mapa.has(chave)) mapa.set(chave, { ativos: [], encerrados: [] });
+        
+        // Verifica se o jogo acabou há mais de 2.5 minutos
+        const agora_ms = new Date().getTime();
+        const fim_jogo = new Date(j.data_hora).getTime();
+        const tempoPassado = agora_ms - fim_jogo;
+        
+        if (j.encerrado && tempoPassado > this.TEMPO_ENCERRADO) {
+          mapa.get(chave)!.encerrados.push(j);
+        } else {
+          mapa.get(chave)!.ativos.push(j);
+        }
       }
-      this.dias = [...mapa.entries()].map(([chave, lista]) =>
-        ({ chave, data: lista[0].data_hora, jogos: lista }));
+      
+      this.dias = [...mapa.entries()].map(([chave, { ativos, encerrados }]) => ({
+        chave,
+        data: [...ativos, ...encerrados][0].data_hora,
+        jogosAtivos: ativos,
+        jogosEncerrados: encerrados,
+        expandido: false
+      }));
+      
       this.carregando = false;
     });
   }
@@ -242,7 +352,6 @@ filtrar(periodo: 'hoje' | 'semana' | 'todos') {
       next: aposta => {
         jogo.minha_aposta = aposta;
         this.cancelarAposta();
-        // Atualizar a lista
         this.filtrar(this.periodo);
       },
       error: e => {
