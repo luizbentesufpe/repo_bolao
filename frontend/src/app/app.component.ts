@@ -14,8 +14,8 @@ import { AuthService } from './core/auth.service';
           <nav class="nav">
             <a routerLink="/jogos" routerLinkActive="ativo">Jogos</a>
             <a routerLink="/bolao" routerLinkActive="ativo">Fazer bolão</a>
-            <a routerLink="/resultados" routerLinkActive="ativo">Resultados</a>
             <a routerLink="/ranking" routerLinkActive="ativo">Mais acertos</a>
+            <a routerLink="/ranking-jogo" routerLinkActive="ativo">Ranking/Jogo</a>
           </nav>
           <div class="usuario">
             <span>{{ auth.usuario()?.username }}</span>

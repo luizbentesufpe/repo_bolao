@@ -6,6 +6,7 @@ import { BolaoComponent } from './pages/bolao.component';
 import { ResultadosComponent } from './pages/resultados.component';
 import { RankingComponent } from './pages/ranking.component';
 import { ResetSenhaComponent } from './pages/reset-senha.component';
+import { RankingJogoComponent } from './pages/ranking-jogo.component';
 
 
 export const routes: Routes = [
@@ -15,6 +16,7 @@ export const routes: Routes = [
   { path: 'bolao', component: BolaoComponent, canActivate: [authGuard] },
   { path: 'resultados', component: ResultadosComponent, canActivate: [authGuard] },
   { path: 'ranking', component: RankingComponent, canActivate: [authGuard] },
+  { path: 'ranking-jogo', component: RankingJogoComponent, canActivate: [authGuard] },
   { path: '', pathMatch: 'full', redirectTo: 'jogos' },
   { path: '**', redirectTo: 'jogos' },
 ];

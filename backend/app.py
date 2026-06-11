@@ -10,6 +10,9 @@ Rodar:
 
 import os
 from datetime import timedelta
+from datetime import datetime
+from scheduler import iniciar_scheduler, parar_scheduler
+import atexit
 
 from flask import Flask, jsonify, request
 from flask_cors import CORS
@@ -46,6 +49,12 @@ CORS(
         }
     },
 )
+
+with app.app_context():
+    iniciar_scheduler()
+
+
+atexit.register(lambda: parar_scheduler())
 
 
 def erro(msg, status=400):
@@ -270,6 +279,19 @@ def resetar_senha():
     db.session.commit()
     return jsonify({"ok": True, "msg": "Senha alterada com sucesso!"}), 200
 
-
+@app.post('/api/admin/sync-resultados')
+@jwt_required()
+def sync_resultados():
+    """Sincroniza resultados com a API football-data.org"""
+    from sync_resultados import sincronizar_resultados
+    
+    # Você pode adicionar verificação de admin aqui
+    sucesso = sincronizar_resultados()
+    
+    if sucesso:
+        return jsonify({'ok': True, 'msg': 'Resultados sincronizados com sucesso!'}), 200
+    else:
+        return jsonify({'ok': False, 'erro': 'Falha ao sincronizar'}), 500
+    
 if __name__ == "__main__":
     app.run(debug=True)

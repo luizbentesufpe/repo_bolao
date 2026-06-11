@@ -15,3 +15,4 @@ PyJWT==2.13.0
 SQLAlchemy==2.0.50
 typing_extensions==4.15.0
 Werkzeug==3.1.8
+APScheduler==3.10.4
