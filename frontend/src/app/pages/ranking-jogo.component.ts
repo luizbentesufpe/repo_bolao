@@ -263,6 +263,7 @@ export class RankingJogoComponent implements OnInit, OnDestroy {
 
   ngOnInit() {
     this.carregarDados();
+    this.atualizarLista();  // ✅ ADICIONE
     this.intervaloAtualizacao = setInterval(() => this.carregarDados(), 10000);
   }
 
