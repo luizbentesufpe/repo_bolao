@@ -75,6 +75,7 @@ class Jogo(db.Model):
     data_hora = db.Column(db.DateTime, nullable=False)
     gols_time1 = db.Column(db.SmallInteger, nullable=True)
     gols_time2 = db.Column(db.SmallInteger, nullable=True)
+    status_api = db.Column(db.String(50), default="TIMED")
     estadio = db.Column(db.String(255), default='')
     cidade_estado = db.Column(db.String(255), default='')
 
@@ -91,8 +92,8 @@ class Jogo(db.Model):
 
     @property
     def comecou(self):
-        return datetime.utcnow() >= self.data_hora
-
+        return self.status_api in ["LIVE", "IN_PLAY", "FINISHED"]
+    
     def to_dict(self):
         return {
             'id': self.id,

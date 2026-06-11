@@ -249,7 +249,6 @@ export class JogosComponent implements OnInit, OnDestroy {
   palpite2: number | null = null;
   tempos = new Map<number, string>();
   private intervaloAtualizacao: any;
-  private TEMPO_ENCERRADO = 10800000; // 2.5 minutos em ms
 
   constructor(private api: ApiService) {}
 
@@ -286,12 +285,8 @@ export class JogosComponent implements OnInit, OnDestroy {
         
         if (!mapa.has(chave)) mapa.set(chave, { ativos: [], encerrados: [] });
         
-        // Verifica se o jogo acabou há mais de 2.5 minutos
-        const agora_ms = new Date().getTime();
-        const fim_jogo = new Date(j.data_hora).getTime();
-        const tempoPassado = agora_ms - fim_jogo;
-        
-        if (j.encerrado && tempoPassado > this.TEMPO_ENCERRADO) {
+        // ✅ Usa status_api do backend (FINISHED = encerrado)
+        if (j.encerrado) {
           mapa.get(chave)!.encerrados.push(j);
         } else {
           mapa.get(chave)!.ativos.push(j);
