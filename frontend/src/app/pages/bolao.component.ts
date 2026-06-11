@@ -46,10 +46,10 @@ interface JogoComPalpite extends Jogo {
             </div>
 
             <div class="placar">
-              <input type="number" min="0" max="99" [(ngModel)]="jogo.palpite1"
+              <input type="number" min="0" max="99" [(ngModel)]="jogo.palpite1" [disabled]="jogo.comecou"
                      [attr.aria-label]="'Gols de ' + jogo.time1.nome">
               <span class="x">×</span>
-              <input type="number" min="0" max="99" [(ngModel)]="jogo.palpite2"
+              <input type="number" min="0" max="99" [(ngModel)]="jogo.palpite2" [disabled]="jogo.comecou"
                      [attr.aria-label]="'Gols de ' + jogo.time2.nome">
             </div>
 
@@ -71,7 +71,7 @@ interface JogoComPalpite extends Jogo {
                   <span style="color:var(--campo); font-weight:700; font-size:12px;">Palpite salvo ✓</span> 
                 }
                 <button class="btn" (click)="salvar(jogo)"
-                        [disabled]="jogo.salvando || jogo.palpite1 === null || jogo.palpite2 === null"
+                        [disabled]="jogo.comecou || jogo.salvando || jogo.palpite1 === null || jogo.palpite2 === null"
                         style="font-size:12px; padding:8px 12px;">
                   {{ jogo.minha_aposta ? 'Atualizar' : 'Salvar' }}
                 </button>
@@ -83,16 +83,29 @@ interface JogoComPalpite extends Jogo {
     </main>
   `,
 })
-export class BolaoComponent implements OnInit {
+export class BolaoComponent implements OnInit, OnDestroy {
   dias: { chave: string; data: string; jogos: JogoComPalpite[] }[] = [];
   carregando = true;
+  private intervaloAtualizacao: any;  // ✅ ADICIONE
 
   constructor(private api: ApiService) {}
 
   ngOnInit() {
+    this.carregarJogos();
+    // ✅ ADICIONE: recarrega a cada 30 segundos
+    this.intervaloAtualizacao = setInterval(() => this.carregarJogos(), 30000);
+  }
+
+  ngOnDestroy() {
+    if (this.intervaloAtualizacao) {
+      clearInterval(this.intervaloAtualizacao);
+    }
+  }
+
+  private carregarJogos() {
     this.api.jogos('todos').subscribe(jogos => {
       const jogosFiltrados = jogos
-        .filter(j => !j.comecou)
+        .filter(j => !j.comecou)  // Remove jogos que começaram
         .map(j => ({
           ...j,
           palpite1: j.minha_aposta?.gols_time1 ?? null,
@@ -102,7 +115,6 @@ export class BolaoComponent implements OnInit {
           erro: '',
         }));
 
-      // Agrupar por dia
       const mapa = new Map<string, JogoComPalpite[]>();
       for (const j of jogosFiltrados) {
         const dataLocal = new Date(j.data_hora);
@@ -123,6 +135,11 @@ export class BolaoComponent implements OnInit {
   }
 
   salvar(jogo: JogoComPalpite) {
+    if (jogo.comecou) {  // ✅ BLOQUEIE se começou
+      jogo.erro = 'Apostas encerradas: o jogo já começou.';
+      return;
+    }
+    
     jogo.salvando = true;
     jogo.salvo = false;
     jogo.erro = '';
@@ -132,7 +149,6 @@ export class BolaoComponent implements OnInit {
         jogo.minha_aposta = aposta;
         jogo.salvando = false;
         jogo.salvo = true;
-        // Remove o "salvo" após 3 segundos
         setTimeout(() => (jogo.salvo = false), 3000);
       },
       error: e => {
