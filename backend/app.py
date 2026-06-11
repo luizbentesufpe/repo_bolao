@@ -56,6 +56,39 @@ def erro(msg, status=400):
     return jsonify({"erro": msg}), status
 
 
+# ✅ FUNÇÃO PARA CALCULAR PONTOS
+def calcular_pontos(aposta, jogo):
+    """
+    Calcula pontos da aposta baseado na nova regra:
+    - Placar exato: 5 pts
+    - Vencedor/Empate: 2 pts
+    - Gols de uma equipe: 1 pt
+    - Errou: 0 pts
+    """
+    if aposta.gols_time1 is None or aposta.gols_time2 is None:
+        return 0
+    
+    if jogo.gols_time1 is None or jogo.gols_time2 is None:
+        return 0
+    
+    # Placar exato
+    if aposta.gols_time1 == jogo.gols_time1 and aposta.gols_time2 == jogo.gols_time2:
+        return 5
+    
+    # Vencedor ou empate
+    meu_resultado = "empate" if aposta.gols_time1 == aposta.gols_time2 else ("time1" if aposta.gols_time1 > aposta.gols_time2 else "time2")
+    real_resultado = "empate" if jogo.gols_time1 == jogo.gols_time2 else ("time1" if jogo.gols_time1 > jogo.gols_time2 else "time2")
+    
+    if meu_resultado == real_resultado:
+        return 2
+    
+    # Gols de uma equipe
+    if aposta.gols_time1 == jogo.gols_time1 or aposta.gols_time2 == jogo.gols_time2:
+        return 1
+    
+    return 0
+
+
 # ---------------------------------------------------------------- AUTENTICACAO
 @app.post("/api/auth/register")
 def register():
@@ -149,17 +182,21 @@ def listar_jogos():
     return jsonify(saida)
 
 
-@app.get("/api/jogos/<int:jogo_id>/apostas")
-@jwt_required()
+@app.get("/api/apostas-do-jogo/<int:jogo_id>")
+@jwt_required(optional=True)
 def apostas_do_jogo(jogo_id):
     """Resultado do bolao por jogo: todas as apostas + pontos de cada um."""
     jogo = Jogo.query.get_or_404(jogo_id)
 
-    apostas = sorted(jogo.apostas, key=lambda a: a.pontos(), reverse=True)
+    # ✅ ORDENA POR COLUNA PONTOS (não calcula dinamicamente)
+    apostas = Aposta.query.filter_by(jogo_id=jogo_id).all()
+    apostas_sorted = sorted(apostas, key=lambda a: (a.pontos or 0), reverse=True)
+    
     return jsonify(
         {
             "jogo": jogo.to_dict(),
-            "apostas": [a.to_dict(com_user=True) for a in apostas],
+            "liberado": not jogo.comecou,
+            "apostas": [a.to_dict(com_user=True) for a in apostas_sorted],
         }
     )
 
@@ -190,8 +227,13 @@ def salvar_aposta():
     if aposta is None:
         aposta = Aposta(jogo_id=jogo.id, user_id=user_id)
         db.session.add(aposta)
+    
     aposta.gols_time1 = g1
     aposta.gols_time2 = g2
+    
+    # ✅ CALCULA E ARMAZENA PONTOS NA COLUNA
+    aposta.pontos = calcular_pontos(aposta, jogo)
+    
     db.session.commit()
     return jsonify(aposta.to_dict()), 200
 
@@ -214,23 +256,21 @@ def ranking():
                 "exatos": 0,
                 "acertos": 0,
                 "apostas": 0,
-                "apostas_pontuadas": 0,  # ✅ Adicione
+                "apostas_pontuadas": 0,
             },
         )
 
         item["apostas"] += 1
 
-        # Só pontua se o jogo tem resultado
-        if jogo.gols_time1 is not None and jogo.gols_time2 is not None:
-            pts = aposta.pontos()
-            item["pontos"] += pts
-            if aposta.exato:
-                item["exatos"] += 1
-            if pts > 0:
-                item["acertos"] += 1
-                item["apostas_pontuadas"] += 1  # ✅ Conte aqui
-
-    # ... resto do código ...
+        # ✅ USA COLUNA PONTOS (não calcula dinamicamente)
+        if aposta.pontos is not None and aposta.pontos > 0:
+            item["pontos"] += aposta.pontos
+            item["acertos"] += 1
+            item["apostas_pontuadas"] += 1
+        
+        # Conta exatos
+        if aposta.gols_time1 == jogo.gols_time1 and aposta.gols_time2 == jogo.gols_time2:
+            item["exatos"] += 1
 
     saida = sorted(
         tabela.values(), key=lambda i: (i["pontos"], i["exatos"]), reverse=True

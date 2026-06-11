@@ -18,13 +18,83 @@ interface JogoComPalpite extends Jogo {
   standalone: true,
   imports: [DatePipe, FormsModule, CommonModule, BandeiraPipe],
   template: `
-    <main class="conteudo">
-      <h1 class="titulo-pagina">Fazer bolão</h1>
-      <p class="subtitulo">
-        Dê seu palpite até a bola rolar. Placar exato vale 5 pontos,
-        acertar o vencedor vale 4 e acertar o empate vale 2.
-      </p>
+<main class="conteudo">
 
+  <h1 class="titulo-pagina">Fazer bolão</h1>
+
+  <p class="subtitulo">
+
+    Dê seu palpite até a bola rolar. Placar exato vale 5 pontos,
+
+    acertar o vencedor vale 4 e acertar o empate vale 2.
+
+  </p>
+
+  <!-- ✅ CARD DE CRITÉRIOS BONITO -->
+
+  <div style="background: linear-gradient(135deg, rgba(255,199,44,0.1) 0%, rgba(14,122,60,0.1) 100%); border: 2px solid var(--amarelo); border-radius: 12px; padding: 20px; margin-bottom: 24px;">
+
+    <h3 style="font-family: var(--fonte-display); font-size: 14px; text-transform: uppercase; color: var(--tinta); margin-bottom: 16px; letter-spacing: 1px;">
+
+      🏆 Critérios de pontuação
+
+    </h3>
+
+    
+
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+
+      <!-- Exato -->
+
+      <div style="padding: 12px; background: white; border-radius: 8px; border-left: 4px solid var(--campo);">
+
+        <div style="font-weight: 700; color: var(--campo); font-size: 18px;">5</div>
+
+        <div style="font-size: 12px; color: var(--tinta-fraca);">Placar exato</div>
+
+        <div style="font-size: 11px; color: #999; margin-top: 4px;">2×0 = 2×0 ✓</div>
+
+      </div>
+
+      <!-- Vencedor -->
+
+      <div style="padding: 12px; background: white; border-radius: 8px; border-left: 4px solid var(--amarelo);">
+
+        <div style="font-weight: 700; color: var(--amarelo); font-size: 18px;">2</div>
+
+        <div style="font-size: 12px; color: var(--tinta-fraca);">Vencedor/Empate</div>
+
+        <div style="font-size: 11px; color: #999; margin-top: 4px;">3×1 = 2×1 ✓</div>
+
+      </div>
+
+      <!-- Gols parcial -->
+
+      <div style="padding: 12px; background: white; border-radius: 8px; border-left: 4px solid #666;">
+
+        <div style="font-weight: 700; color: #666; font-size: 18px;">1</div>
+
+        <div style="font-size: 12px; color: var(--tinta-fraca);">Gols de uma equipe</div>
+
+        <div style="font-size: 11px; color: #999; margin-top: 4px;">2×0 = 2×1 ✓</div>
+
+      </div>
+
+      <!-- Errou -->
+
+      <div style="padding: 12px; background: white; border-radius: 8px; border-left: 4px solid #ddd;">
+
+        <div style="font-weight: 700; color: #999; font-size: 18px;">0</div>
+
+        <div style="font-size: 12px; color: var(--tinta-fraca);">Resultado incorreto</div>
+
+        <div style="font-size: 11px; color: #999; margin-top: 4px;">1×1 = 2×0 ✗</div>
+
+      </div>
+
+    </div>
+
+  </div>
       @if (carregando) {
         <p class="vazio">Carregando jogos…</p>
       } @else if (dias.length === 0) {
@@ -176,22 +246,22 @@ interface JogoComPalpite extends Jogo {
   `]
 })
 export class BolaoComponent implements OnInit, OnDestroy {
-  dias: { 
-    chave: string; 
-    data: string; 
+  dias: {
+    chave: string;
+    data: string;
     jogosAbertos: JogoComPalpite[];
     jogosEncerrados: JogoComPalpite[];
     expandido: boolean;
   }[] = [];
   carregando = true;
 
-  constructor(private api: ApiService) {}
+  constructor(private api: ApiService) { }
 
   ngOnInit() {
     this.carregarJogos();
   }
 
-  ngOnDestroy() {}
+  ngOnDestroy() { }
 
   private carregarJogos() {
     this.api.jogos('todos').subscribe(jogos => {
@@ -205,14 +275,14 @@ export class BolaoComponent implements OnInit, OnDestroy {
       }));
 
       const mapa = new Map<string, { abertos: JogoComPalpite[], encerrados: JogoComPalpite[] }>();
-      
+
       for (const j of jogosFiltrados) {
         const dataLocal = new Date(j.data_hora);
         const chave = dataLocal.toLocaleDateString('pt-BR')
           .split('/').reverse().join('-');
-        
+
         if (!mapa.has(chave)) mapa.set(chave, { abertos: [], encerrados: [] });
-        
+
         if (j.encerrado) {
           mapa.get(chave)!.encerrados.push(j);
         } else {
@@ -243,7 +313,7 @@ export class BolaoComponent implements OnInit, OnDestroy {
       jogo.erro = 'Apostas encerradas: o jogo já começou.';
       return;
     }
-    
+
     jogo.salvando = true;
     jogo.salvo = false;
     jogo.erro = '';
