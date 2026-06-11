@@ -25,7 +25,7 @@ def iniciar_scheduler():
         
         # Sincronizar a cada 5 minutos
         scheduler.add_job(
-            sincronizar_resultados,
+            lambda: sincronizar_resultados(verbose=False),
             'interval',
             minutes=5,
             id='sync_resultados',

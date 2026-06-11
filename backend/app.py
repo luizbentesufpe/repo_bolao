@@ -286,7 +286,7 @@ def sync_resultados():
     from sync_resultados import sincronizar_resultados
     
     # Você pode adicionar verificação de admin aqui
-    sucesso = sincronizar_resultados()
+    sucesso = sincronizar_resultados(app=app)
     
     if sucesso:
         return jsonify({'ok': True, 'msg': 'Resultados sincronizados com sucesso!'}), 200
