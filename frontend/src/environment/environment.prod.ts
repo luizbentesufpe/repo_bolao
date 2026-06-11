@@ -1,4 +1,4 @@
 export const environment = {
   production: true,
-  apiUrl: 'https://bolao-backend.onrender.com'  // sua URL do backend no Render
+  apiUrl: 'https://repo-bolao.onrender.com'  // sua URL do backend no Render
 };

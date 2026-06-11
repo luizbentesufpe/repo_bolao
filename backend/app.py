@@ -8,6 +8,7 @@ Rodar:
     flask --app app run --debug   # http://localhost:5000
 """
 
+import os
 from datetime import timedelta
 
 from flask import Flask, jsonify, request
@@ -19,22 +20,32 @@ from flask_jwt_extended import (
     jwt_required,
 )
 from models import Aposta, Jogo, User, db
-from functools import wraps
-from flask import request, jsonify
- 
-import os
 
 app = Flask(__name__)
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 
-app.config["SQLALCHEMY_DATABASE_URI"] = \
+app.config["SQLALCHEMY_DATABASE_URI"] = (
     f"sqlite:///{os.path.join(BASE_DIR, 'bolao.db')}"
-app.config['JWT_SECRET_KEY'] = os.getenv('JWT_SECRET_KEY', 'chave-desenvolvimento-insegura')
+)
+app.config["JWT_SECRET_KEY"] = os.getenv(
+    "JWT_SECRET_KEY", "chave-desenvolvimento-insegura"
+)
 app.config["JWT_ACCESS_TOKEN_EXPIRES"] = timedelta(days=7)
 
 db.init_app(app)
 jwt = JWTManager(app)
-CORS(app)
+CORS(
+    app,
+    resources={
+        r"/api/*": {
+            "origins": [
+                "https://bolao-web-0s5h.onrender.com"
+            ],  # COLE A URL DO FRONTEND AQUI
+            "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+            "allow_headers": ["Content-Type", "Authorization"],
+        }
+    },
+)
 
 
 def erro(msg, status=400):
@@ -217,46 +228,47 @@ def lancar_resultado(jogo_id):
     return jsonify(jogo.to_dict())
 
 
-@app.post('/api/auth/solicitar-reset')
+@app.post("/api/auth/solicitar-reset")
 def solicitar_reset():
     """Gera um token de reset e 'envia' por email (simula aqui)."""
     dados = request.get_json(silent=True) or {}
-    email = (dados.get('email') or '').strip().lower()
+    email = (dados.get("email") or "").strip().lower()
 
     user = User.query.filter_by(email=email).first()
     if not user:
         # Nao revela se email existe ou nao (seguranca)
-        return jsonify({'ok': True,
-                       'msg': 'Se o email existe, recebera um link de reset.'}), 200
+        return jsonify(
+            {"ok": True, "msg": "Se o email existe, recebera um link de reset."}
+        ), 200
 
     # Token válido por 1 hora
     reset_token = create_access_token(
-        identity=str(user.id),
-        expires_delta=timedelta(hours=1)
+        identity=str(user.id), expires_delta=timedelta(hours=1)
     )
     # Em producao: enviar email com link
     # https://seu-app.com/resetar-senha?token=TOKEN
     print(f"[DEBUG] Reset token para {email}: {reset_token}")
 
-    return jsonify({'ok': True,
-                   'msg': 'Link de reset enviado (verifique o terminal para teste).'}), 200
+    return jsonify(
+        {"ok": True, "msg": "Link de reset enviado (verifique o terminal para teste)."}
+    ), 200
 
 
-@app.post('/api/auth/resetar-senha')
+@app.post("/api/auth/resetar-senha")
 @jwt_required()
 def resetar_senha():
     """Reseta a senha do usuario logado (com token de reset valido)."""
     user_id = int(get_jwt_identity())
     dados = request.get_json(silent=True) or {}
-    nova_senha = dados.get('nova_senha') or ''
+    nova_senha = dados.get("nova_senha") or ""
 
     if len(nova_senha) < 4:
-        return erro('A senha precisa de pelo menos 4 caracteres.')
+        return erro("A senha precisa de pelo menos 4 caracteres.")
 
     user = User.query.get(user_id)
     user.set_senha(nova_senha)
     db.session.commit()
-    return jsonify({'ok': True, 'msg': 'Senha alterada com sucesso!'}), 200
+    return jsonify({"ok": True, "msg": "Senha alterada com sucesso!"}), 200
 
 
 if __name__ == "__main__":
