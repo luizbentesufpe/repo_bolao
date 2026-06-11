@@ -24,7 +24,7 @@ import { AuthService } from '../core/auth.service';
           @if (modo === 'cadastro') {
             <div class="campo-form">
               <label for="nome">Nome</label>
-              <input id="nome" name="nome" [(ngModel)]="username" required autocomplete="name" placeholder="Seu nome completo">
+              <input id="nome" name="nome" [(ngModel)]="nome" required autocomplete="name" placeholder="Seu nome">
             </div>
           }
 
@@ -54,7 +54,7 @@ import { AuthService } from '../core/auth.service';
 })
 export class AuthComponent {
   modo: 'login' | 'cadastro' = 'login';
-  username = '';
+  nome = '';
   email = '';
   senha = '';
   erro = '';
@@ -65,15 +65,17 @@ export class AuthComponent {
   trocar(modo: 'login' | 'cadastro') {
     this.modo = modo;
     this.erro = '';
+    this.nome = '';
+    this.email = '';
+    this.senha = '';
   }
 
   enviar() {
     this.erro = '';
     this.enviando = true;
     const obs = this.modo === 'login'
-      ? this.auth.login(this.username, this.senha)
-      : this.auth.register(this.username, this.email, this.senha);
-
+      ? this.auth.login(this.email, this.senha)
+      : this.auth.register(this.nome, this.email, this.senha);
     obs.subscribe({
       next: () => this.router.navigate(['/jogos']),
       error: e => {
