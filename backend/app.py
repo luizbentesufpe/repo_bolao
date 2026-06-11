@@ -12,7 +12,6 @@ import atexit
 import os
 from datetime import timedelta
 
-from dotenv import load_dotenv
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 from flask_jwt_extended import (
@@ -21,10 +20,6 @@ from flask_jwt_extended import (
     get_jwt_identity,
     jwt_required,
 )
-
-load_dotenv()
-
-
 from models import Aposta, Jogo, User, db
 from scheduler import iniciar_scheduler, parar_scheduler
 
