@@ -1,0 +1,20 @@
+import { Routes } from '@angular/router';
+import { authGuard } from './core/auth.guard';
+import { AuthComponent } from './pages/auth.component';
+import { JogosComponent } from './pages/jogos.component';
+import { BolaoComponent } from './pages/bolao.component';
+import { ResultadosComponent } from './pages/resultados.component';
+import { RankingComponent } from './pages/ranking.component';
+import { ResetSenhaComponent } from './pages/reset-senha.component';
+
+
+export const routes: Routes = [
+  { path: 'entrar', component: AuthComponent },
+  { path: 'resetar-senha', component: ResetSenhaComponent },
+  { path: 'jogos', component: JogosComponent, canActivate: [authGuard] },
+  { path: 'bolao', component: BolaoComponent, canActivate: [authGuard] },
+  { path: 'resultados', component: ResultadosComponent, canActivate: [authGuard] },
+  { path: 'ranking', component: RankingComponent, canActivate: [authGuard] },
+  { path: '', pathMatch: 'full', redirectTo: 'jogos' },
+  { path: '**', redirectTo: 'jogos' },
+];
