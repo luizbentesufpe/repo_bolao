@@ -11,6 +11,7 @@ scheduler = BackgroundScheduler()
 
 
 def iniciar_scheduler():
+    from app import app
     """Inicia o scheduler de sincronização."""
     from sync_resultados import sincronizar_resultados
     # Data de início e fim da Copa 2026
@@ -25,7 +26,7 @@ def iniciar_scheduler():
         
         # Sincronizar a cada 5 minutos
         scheduler.add_job(
-            lambda: sincronizar_resultados(verbose=False),
+            lambda: sincronizar_resultados(app=app, verbose=False),
             'interval',
             minutes=5,
             id='sync_resultados',
