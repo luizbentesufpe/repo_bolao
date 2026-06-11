@@ -20,18 +20,18 @@ import { AuthService } from '../core/auth.service';
 
         @if (erro) { <div class="msg-erro">{{ erro }}</div> }
 
-        <form (ngSubmit)="enviar()">
-          <div class="campo-form">
-            <label for="username">Username</label>
-            <input id="username" name="username" [(ngModel)]="username" required autocomplete="username">
-          </div>
-
+<form (ngSubmit)="enviar()">
           @if (modo === 'cadastro') {
             <div class="campo-form">
-              <label for="email">Email</label>
-              <input id="email" name="email" type="email" [(ngModel)]="email" required autocomplete="email">
+              <label for="nome">Nome</label>
+              <input id="nome" name="nome" [(ngModel)]="username" required autocomplete="name" placeholder="Seu nome completo">
             </div>
           }
+
+          <div class="campo-form">
+            <label for="email">Email</label>
+            <input id="email" name="email" type="email" [(ngModel)]="email" required autocomplete="email" placeholder="seu@email.com">
+          </div>
 
           <div class="campo-form">
             <label for="senha">Senha</label>

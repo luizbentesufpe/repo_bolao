@@ -8,11 +8,9 @@ Rodar:
     flask --app app run --debug   # http://localhost:5000
 """
 
+import atexit
 import os
 from datetime import timedelta
-from datetime import datetime
-from scheduler import iniciar_scheduler, parar_scheduler
-import atexit
 
 from flask import Flask, jsonify, request
 from flask_cors import CORS
@@ -23,13 +21,17 @@ from flask_jwt_extended import (
     jwt_required,
 )
 from models import Aposta, Jogo, User, db
+from scheduler import iniciar_scheduler, parar_scheduler
 
 app = Flask(__name__)
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 
-app.config["SQLALCHEMY_DATABASE_URI"] = (
-    f"sqlite:///{os.path.join(BASE_DIR, 'bolao.db')}"
+app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv(
+    "DATABASE_URL",
+    "sqlite:///bolao.db",  # fallback local para desenvolvimento
 )
+
+
 app.config["JWT_SECRET_KEY"] = os.getenv(
     "JWT_SECRET_KEY", "chave-desenvolvimento-insegura"
 )
@@ -65,20 +67,18 @@ def erro(msg, status=400):
 @app.post("/api/auth/register")
 def register():
     dados = request.get_json(silent=True) or {}
-    username = (dados.get("username") or "").strip()
+    nome = (dados.get("nome") or "").strip()
     email = (dados.get("email") or "").strip().lower()
     senha = dados.get("senha") or ""
 
-    if not username or not email or not senha:
-        return erro("Informe username, email e senha.")
+    if not nome or not email or not senha:
+        return erro("Informe nome, email e senha.")
     if len(senha) < 4:
         return erro("A senha precisa de pelo menos 4 caracteres.")
-    if User.query.filter_by(username=username).first():
-        return erro("Esse username ja esta em uso.")
     if User.query.filter_by(email=email).first():
         return erro("Esse email ja esta cadastrado.")
 
-    user = User(username=username, email=email)
+    user = User(nome=nome, email=email)
     user.set_senha(senha)
     db.session.add(user)
     db.session.commit()
@@ -87,7 +87,7 @@ def register():
     return jsonify(
         {
             "token": token,
-            "user": {"id": user.id, "username": user.username, "email": user.email},
+            "user": {"id": user.id, "nome": user.nome, "email": user.email},
         }
     ), 201
 
@@ -95,18 +95,18 @@ def register():
 @app.post("/api/auth/login")
 def login():
     dados = request.get_json(silent=True) or {}
-    username = (dados.get("username") or "").strip()
+    email = (dados.get("email") or "").strip().lower()
     senha = dados.get("senha") or ""
 
-    user = User.query.filter_by(username=username).first()
+    user = User.query.filter_by(email=email).first()
     if not user or not user.checa_senha(senha):
-        return erro("Username ou senha invalidos.", 401)
+        return erro("Email ou senha invalidos.", 401)
 
     token = create_access_token(identity=str(user.id))
     return jsonify(
         {
             "token": token,
-            "user": {"id": user.id, "username": user.username, "email": user.email},
+             "user": {"id": user.id, "nome": user.nome, "email": user.email},
         }
     )
 
@@ -198,7 +198,7 @@ def ranking():
         item = tabela.setdefault(
             aposta.user_id,
             {
-                "username": aposta.user.username,
+                "nome": aposta.user.nome,
                 "pontos": 0,
                 "exatos": 0,
                 "acertos": 0,
@@ -279,19 +279,23 @@ def resetar_senha():
     db.session.commit()
     return jsonify({"ok": True, "msg": "Senha alterada com sucesso!"}), 200
 
-@app.post('/api/admin/sync-resultados')
+
+@app.post("/api/admin/sync-resultados")
 @jwt_required()
 def sync_resultados():
     """Sincroniza resultados com a API football-data.org"""
     from sync_resultados import sincronizar_resultados
-    
+
     # Você pode adicionar verificação de admin aqui
     sucesso = sincronizar_resultados(app=app)
-    
+
     if sucesso:
-        return jsonify({'ok': True, 'msg': 'Resultados sincronizados com sucesso!'}), 200
+        return jsonify(
+            {"ok": True, "msg": "Resultados sincronizados com sucesso!"}
+        ), 200
     else:
-        return jsonify({'ok': False, 'erro': 'Falha ao sincronizar'}), 500
-    
+        return jsonify({"ok": False, "erro": "Falha ao sincronizar"}), 500
+
+
 if __name__ == "__main__":
     app.run(debug=True)

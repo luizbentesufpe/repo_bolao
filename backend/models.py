@@ -18,7 +18,7 @@ PONTOS_EMPATE = 2         # acertou o empate, sem o placar exato
 class User(db.Model):
     __tablename__ = 'users'
     id = db.Column(db.Integer, primary_key=True)
-    username = db.Column(db.String(150), unique=True, nullable=False)
+    nome = db.Column(db.String(120), nullable=False)
     email = db.Column(db.String(255), unique=True, nullable=False)
     senha_hash = db.Column(db.String(255), nullable=False)
 
@@ -31,7 +31,7 @@ class User(db.Model):
         return check_password_hash(self.senha_hash, senha)
 
     def __repr__(self):
-        return self.username
+        return self.nome
 
 
 class Time(db.Model):
@@ -155,5 +155,6 @@ class Aposta(db.Model):
             'pontos': self.pontos(),
         }
         if com_user:
-            d['username'] = self.user.username
+            d['email'] = self.user.email
+            d['nome'] = self.user.nome
         return d

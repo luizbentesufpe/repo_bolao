@@ -23,12 +23,12 @@ export class AuthService {
   get logado(): boolean { return !!this.token; }
 
   login(username: string, senha: string) {
-    return this.http.post<AuthResposta>(`${API}/auth/login`, { username, senha })
+    return this.http.post<AuthResposta>(`${API}/auth/login`, { email: username, senha })
       .pipe(tap(r => this.guardar(r)));
   }
 
   register(username: string, email: string, senha: string) {
-    return this.http.post<AuthResposta>(`${API}/auth/register`, { username, email, senha })
+    return this.http.post<AuthResposta>(`${API}/auth/register`, { nome: username, email, senha })
       .pipe(tap(r => this.guardar(r)));
   }
 
