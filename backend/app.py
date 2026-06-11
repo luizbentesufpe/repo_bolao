@@ -199,7 +199,7 @@ def ranking():
         item = tabela.setdefault(
             aposta.user_id,
             {
-                "nome": aposta.user.nome,
+                "nome": aposta.user.nome,  # ✅ Certifique-se que está aqui
                 "pontos": 0,
                 "exatos": 0,
                 "acertos": 0,
