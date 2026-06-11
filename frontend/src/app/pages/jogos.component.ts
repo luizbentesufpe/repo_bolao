@@ -167,13 +167,24 @@ export class JogosComponent implements OnInit {
     clearInterval(this.intervaloAtualizacao);
   }
 
-  filtrar(periodo: 'hoje' | 'semana' | 'todos') {
+filtrar(periodo: 'hoje' | 'semana' | 'todos') {
     this.periodo = periodo;
     this.carregando = true;
-    this.api.jogos(periodo).subscribe(jogos => {
+    // Sempre pede TODOS, filtra no front pelo timezone do navegador
+    this.api.jogos('todos').subscribe(jogos => {
+      const agora = new Date();
+      const hoje00h = new Date(agora.getFullYear(), agora.getMonth(), agora.getDate());
+      const hoje23h59 = new Date(hoje00h.getTime() + 86400000 - 1);
+      const semana00h = new Date(hoje00h.getTime() + 604800000);
+
       const mapa = new Map<string, Jogo[]>();
       for (const j of jogos) {
         const dataLocal = new Date(j.data_hora);
+
+        // Filtrar pelo periodo escolhido
+        if (periodo === 'hoje' && (dataLocal < hoje00h || dataLocal > hoje23h59)) continue;
+        if (periodo === 'semana' && dataLocal > semana00h) continue;
+
         const chave = dataLocal.toLocaleDateString('pt-BR')
           .split('/').reverse().join('-');
         if (!mapa.has(chave)) mapa.set(chave, []);
