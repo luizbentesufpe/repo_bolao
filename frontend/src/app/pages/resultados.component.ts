@@ -54,8 +54,8 @@ import { AuthService } from '../core/auth.service';
             </thead>
             <tbody>
               @for (aposta of detalhe.apostas; track aposta.id) {
-                <tr [class.eu]="aposta.username === meuUsername">
-                  <td>{{ aposta.username }} @if (aposta.username === meuUsername) { (você) }</td>
+                <tr [class.eu]="aposta.email === meuEmail">
+                  <td>{{ aposta.nome }} @if (aposta.email === meuEmail) {(você) }</td>
                   <td class="num">{{ aposta.gols_time1 }} × {{ aposta.gols_time2 }}</td>
                   <td class="num">{{ detalhe.jogo.encerrado ? aposta.pontos : '—' }}</td>
                 </tr>
@@ -71,10 +71,10 @@ export class ResultadosComponent implements OnInit {
   jogos: Jogo[] = [];
   jogoSelecionado: number | null = null;
   detalhe: ApostasDoJogo | null = null;
-  meuUsername = '';
+  meuEmail = '';
 
   constructor(private api: ApiService, auth: AuthService) {
-    this.meuUsername = auth.usuario()?.username ?? '';
+    this.meuEmail = auth.usuario()?.email ?? '';
   }
 
   ngOnInit() {
