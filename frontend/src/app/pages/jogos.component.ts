@@ -63,10 +63,14 @@ import { BandeiraPipe } from '../core/bandeiras.pipe';
 
               <span>{{ jogo.estadio }}</span>
 
-              @if (jogo.minha_aposta) {
+              @if (jogo.minha_aposta && jogo.minha_aposta.gols_time1 !== null && jogo.minha_aposta.gols_time2 !== null) { 
                 <span class="pontos-chip" [class.cheio]="jogo.encerrado && jogo.minha_aposta.pontos > 0">
                   {{ jogo.minha_aposta.gols_time1 }}×{{ jogo.minha_aposta.gols_time2 }}
                   @if (jogo.encerrado) { · {{ jogo.minha_aposta.pontos }} pts }
+                </span>
+              } @else {
+                <span style="font-size: 12px; color: #999; padding: 4px 8px;">
+                  ⊘ Sem aposta
                 </span>
               }
 

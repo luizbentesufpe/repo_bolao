@@ -12,6 +12,7 @@ import atexit
 import os
 from datetime import timedelta
 
+from dotenv import load_dotenv
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 from flask_jwt_extended import (
@@ -20,6 +21,10 @@ from flask_jwt_extended import (
     get_jwt_identity,
     jwt_required,
 )
+
+load_dotenv()
+
+
 from models import Aposta, Jogo, User, db
 from scheduler import iniciar_scheduler, parar_scheduler
 
@@ -106,7 +111,7 @@ def login():
     return jsonify(
         {
             "token": token,
-             "user": {"id": user.id, "nome": user.nome, "email": user.email},
+            "user": {"id": user.id, "nome": user.nome, "email": user.email},
         }
     )
 
@@ -146,6 +151,7 @@ def apostas_do_jogo(jogo_id):
             "apostas": [a.to_dict(com_user=True) for a in apostas],
         }
     )
+
 
 # ------------------------------------------------------------------- APOSTAS
 @app.post("/api/apostas")
