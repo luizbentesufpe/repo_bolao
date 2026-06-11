@@ -2,8 +2,9 @@ import { Injectable, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { tap } from 'rxjs';
 import { Usuario } from './models';
+import { environment } from '../../environment/environment.prod';
 
-const API = 'http://localhost:5000/api';
+const API = `${environment.apiUrl}/api`;
 
 interface AuthResposta { token: string; user: Usuario; }
 

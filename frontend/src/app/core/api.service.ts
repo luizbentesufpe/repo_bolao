@@ -1,8 +1,10 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Aposta, ApostasDoJogo, Jogo, RankingItem } from './models';
+import { environment } from '../../environment/environment.prod';
 
-const API = 'http://localhost:5000/api';
+
+const API = `${environment.apiUrl}/api`;
 
 @Injectable({ providedIn: 'root' })
 export class ApiService {
