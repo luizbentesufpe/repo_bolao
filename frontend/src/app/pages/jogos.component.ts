@@ -254,11 +254,6 @@ export class JogosComponent implements OnInit, OnDestroy {
 
   ngOnInit() {
     this.filtrar('hoje');
-    // Recarrega dados a cada 5 segundos para atualizar status dos jogos
-    this.intervaloAtualizacao = setInterval(() => {
-      this.tempos.clear();
-      this.filtrar(this.periodo);
-    }, 60000);
   }
 
   ngOnDestroy() {
