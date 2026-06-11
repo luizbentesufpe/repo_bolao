@@ -22,13 +22,25 @@ import { BandeiraPipe } from '../core/bandeiras.pipe';
         <button [class.ativo]="filtro === 'ao-vivo'" (click)="filtro = 'ao-vivo'; atualizarLista()">⚽ Ao vivo</button>
         <button [class.ativo]="filtro === 'em-breve'" (click)="filtro = 'em-breve'; atualizarLista()">Em breve</button>
       </div>
-
+      <!-- SUB-FILTROS DE DATA -->
+      <div class="filtros" style="margin-top: 12px;">
+        <button [class.ativo]="periodo === 'hoje'" (click)="periodo = 'hoje'; atualizarLista()">Hoje</button>
+        <button [class.ativo]="periodo === 'semana'" (click)="periodo = 'semana'; atualizarLista()">Próximos 7 dias</button>
+        <button [class.ativo]="periodo === 'todos'" (click)="periodo = 'todos'; atualizarLista()">Todos</button>
+      </div>
       @if (jogosFiltrados.length === 0) {
         <p class="vazio">Nenhum jogo neste filtro.</p>
       }
 
       <!-- LISTA DE JOGOS PARA SELECIONAR -->
-      @for (jogo of jogosFiltrados; track jogo.id) {
+      <!-- LISTA AGRUPADA POR DATA -->
+      @for (dia of diasAgrupados; track dia.chave) {
+        <div style="margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--linha);">
+          <h3 style="font-family: var(--fonte-display); font-size: 14px; color: var(--tinta-fraca); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px;">
+            {{ dia.data | date:'EEEE, d MMM':'pt-BR' }}
+          </h3>
+
+          @for (jogo of dia.jogos; track jogo.id) {
         <div class="jogo-card" style="cursor: pointer; position: relative;" (click)="buscar(jogo.id)">
           <div class="jogo-time">
             <img [src]="jogo.time1.nome | bandeira" [alt]="jogo.time1.nome" 
@@ -83,6 +95,8 @@ import { BandeiraPipe } from '../core/bandeiras.pipe';
               Sem palpite
             </div>
           }
+        </div>
+      }
         </div>
       }
 
@@ -161,6 +175,8 @@ export class RankingJogoComponent implements OnInit, OnDestroy {
   detalhe: ApostasDoJogo | null = null;
   meuUsername = '';
   filtro: 'todos' | 'encerrado' | 'ao-vivo' | 'em-breve' = 'todos';
+  periodo: 'hoje' | 'semana' | 'todos' = 'todos';
+  diasAgrupados: { chave: string; data: Date; jogos: Jogo[] }[] = [];
   usuariosMeusPalpites: { [key: number]: any } = {};
   private intervaloAtualizacao: any;
   constructor(private api: ApiService, auth: AuthService) {
@@ -177,24 +193,75 @@ export class RankingJogoComponent implements OnInit, OnDestroy {
       clearInterval(this.intervaloAtualizacao);
     }
   }
-  atualizarLista() {
+atualizarLista() {
+    // Primeiro filtra por status
+    let jogos = this.jogos;
+    
     switch (this.filtro) {
       case 'encerrado':
-        this.jogosFiltrados = this.jogos.filter(j => j.encerrado);
+        jogos = jogos.filter(j => j.encerrado);
         break;
       case 'ao-vivo':
-        this.jogosFiltrados = this.jogos.filter(j => j.comecou && !j.encerrado);
+        jogos = jogos.filter(j => j.comecou && !j.encerrado);
         break;
       case 'em-breve':
-        this.jogosFiltrados = this.jogos.filter(j => !j.comecou);
+        jogos = jogos.filter(j => !j.comecou);
         break;
       default:
-        this.jogosFiltrados = this.jogos;
+        jogos = jogos;
     }
+
+    // Depois filtra por período
+    const agora = new Date();
+    const hoje = new Date(agora.getFullYear(), agora.getMonth(), agora.getDate());
+    const proximaSemana = new Date(hoje.getTime() + 7 * 24 * 60 * 60 * 1000);
+
+    switch (this.periodo) {
+      case 'hoje':
+        jogos = jogos.filter(j => {
+          const dataJogo = new Date(j.data_hora);
+          const diaJogo = new Date(dataJogo.getFullYear(), dataJogo.getMonth(), dataJogo.getDate());
+          return diaJogo.getTime() === hoje.getTime();
+        });
+        break;
+      case 'semana':
+        jogos = jogos.filter(j => {
+          const dataJogo = new Date(j.data_hora);
+          return dataJogo >= hoje && dataJogo <= proximaSemana;
+        });
+        break;
+      default:
+        jogos = jogos;
+    }
+
+    this.jogosFiltrados = jogos;
+    this.agruparPorData();
+  }
+
+  private agruparPorData() {
+    const mapa = new Map<string, Jogo[]>();
+    
+    this.jogosFiltrados.forEach(jogo => {
+      const dataLocal = new Date(jogo.data_hora);
+      const chave = dataLocal.toLocaleDateString('pt-BR')
+        .split('/').reverse().join('-'); // YYYY-MM-DD
+      
+      if (!mapa.has(chave)) {
+        mapa.set(chave, []);
+      }
+      mapa.get(chave)!.push(jogo);
+    });
+
+    this.diasAgrupados = [...mapa.entries()]
+      .sort((a, b) => a[0].localeCompare(b[0])) // Ordena por data
+      .map(([chave, jogos]) => {
+        const data = new Date(chave + 'T00:00:00');
+        return { chave, data, jogos };
+      });
   }
 private carregarDados() {
   this.api.jogos('todos').subscribe(jogos => {
-    this.jogos = jogos.sort((a, b) => new Date(b.data_hora).getTime() - new Date(a.data_hora).getTime());
+    this.jogos = jogos.sort((a, b) => new Date(a.data_hora).getTime() - new Date(b.data_hora).getTime());
     
     // Armazena o palpite do usuário para cada jogo
     jogos.forEach(jogo => {
