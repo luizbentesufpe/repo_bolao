@@ -1,97 +1,92 @@
 # -*- coding: utf-8 -*-
 """
-Sincroniza resultados da Copa 2026 da API football-data.org
-Uso: python sync_resultados.py
+Sincroniza resultados com a API football-data.org
 """
-
 import os
-from datetime import datetime
-
 import requests
-from models import Jogo, Time, db
+from datetime import datetime
 
 API_KEY = os.getenv("FOOTBALL_DATA_API_KEY", "")
 BASE_URL = "https://api.football-data.org/v4"
 TOURNAMENT_CODE = "WC"
 
-# Mapa: nome em inglês (da API) -> nome em português (seu banco)
-TIMES_TRANSLATE = {
-    "Mexico": "México",
-    "South Africa": "África do Sul",
-    "South Korea": "Coreia do Sul",
-    "Czech Republic": "República Tcheca",
-    "Canada": "Canadá",
-    "Bosnia and Herzegovina": "Bósnia e Herzegovina",
-    "Qatar": "Catar",
-    "Switzerland": "Suíça",
-    "Brazil": "Brasil",
-    "Morocco": "Marrocos",
-    "Haiti": "Haiti",
-    "Scotland": "Escócia",
-    "United States": "Estados Unidos",
-    "Paraguay": "Paraguai",
-    "Australia": "Austrália",
-    "Turkey": "Turquia",
-    "Germany": "Alemanha",
-    "Curaçao": "Curaçao",
-    "Curacao": "Curaçao",
-    "Ivory Coast": "Costa do Marfim",
-    "Ecuador": "Equador",
-    "Netherlands": "Holanda",
-    "Japan": "Japão",
-    "Sweden": "Suécia",
-    "Tunisia": "Tunísia",
-    "Belgium": "Bélgica",
-    "Egypt": "Egito",
-    "Saudi Arabia": "Arábia Saudita",
-    "Uruguay": "Uruguai",
-    "Iran": "Irã",
-    "New Zealand": "Nova Zelândia",
-    "Spain": "Espanha",
-    "Cape Verde": "Cabo Verde",
-    "France": "França",
-    "Senegal": "Senegal",
-    "Iraq": "Iraque",
-    "Norway": "Noruega",
-    "Argentina": "Argentina",
-    "Algeria": "Argélia",
-    "Austria": "Áustria",
-    "Jordan": "Jordânia",
-    "Portugal": "Portugal",
-    "DR Congo": "RD Congo",
-    "Democratic Republic of the Congo": "RD Congo",
-    "Uzbekistan": "Uzbequistão",
-    "Colombia": "Colômbia",
-    "England": "Inglaterra",
-    "Croatia": "Croácia",
-    "Ghana": "Gana",
-    "Panama": "Panamá",
-}
-
 
 def traduzir_time(nome_ingles):
-    """Converte nome do time de inglês para português."""
-    return TIMES_TRANSLATE.get(nome_ingles, nome_ingles)
+    """Traduz nomes de times do inglês para português"""
+    traducoes = {
+        "Mexico": "México",
+        "South Africa": "África do Sul",
+        "South Korea": "Coreia do Sul",
+        "Czechia": "República Tcheca",
+        "Canada": "Canadá",
+        "Bosnia-Herzegovina": "Bósnia e Herzegovina",
+        "Qatar": "Catar",
+        "Switzerland": "Suíça",
+        "Brazil": "Brasil",
+        "Morocco": "Marrocos",
+        "Haiti": "Haiti",
+        "Scotland": "Escócia",
+        "United States": "Estados Unidos",
+        "Paraguay": "Paraguai",
+        "Australia": "Austrália",
+        "Turkey": "Turquia",
+        "Germany": "Alemanha",
+        "Curaçao": "Curaçau",
+        "Ivory Coast": "Costa do Marfim",
+        "Ecuador": "Equador",
+        "Netherlands": "Holanda",
+        "Japan": "Japão",
+        "Sweden": "Suécia",
+        "Tunisia": "Tunísia",
+        "Belgium": "Bélgica",
+        "Egypt": "Egito",
+        "Iran": "Irã",
+        "New Zealand": "Nova Zelândia",
+        "Spain": "Espanha",
+        "Cape Verde Islands": "Cabo Verde",
+        "Saudi Arabia": "Arábia Saudita",
+        "Uruguay": "Uruguai",
+        "France": "França",
+        "Senegal": "Senegal",
+        "Iraq": "Iraque",
+        "Norway": "Noruega",
+        "Argentina": "Argentina",
+        "Algeria": "Argélia",
+        "Austria": "Áustria",
+        "Jordan": "Jordânia",
+        "Portugal": "Portugal",
+        "Congo DR": "RD Congo",
+        "Uzbekistan": "Uzbequistão",
+        "Colombia": "Colômbia",
+        "England": "Inglaterra",
+        "Croatia": "Croácia",
+        "Ghana": "Gana",
+        "Panama": "Panamá",
+    }
+    return traducoes.get(nome_ingles, nome_ingles)
 
 
-def sincronizar_resultados(app=None, verbose=False):
+def sincronizar_resultados(app=None, verbose=False, status_filter="IN_PLAY"):
     """Sincroniza resultados com a API football-data.org"""
     if app is None:
         from app import app as flask_app
-
         app = flask_app
 
     with app.app_context():
+        from models import Jogo, Time, db
+
         if verbose:
-            print("🔄 Sincronizando resultados...")
+            print("🔄 Sincronizando resultados...", flush=True)
 
         try:
             headers = {"X-Auth-Token": API_KEY}
             url = f"{BASE_URL}/competitions/{TOURNAMENT_CODE}/matches"
-            response = requests.get(url, headers=headers, timeout=10)
+            if status_filter:
+                url += f"?status={status_filter}"
 
+            response = requests.get(url, headers=headers, timeout=10)
             if response.status_code != 200:
-                print(f"❌ Erro API: {response.status_code}")
+                print(f"❌ Erro API: {response.status_code}", flush=True)
                 return False
 
             dados = response.json()
@@ -137,32 +132,35 @@ def sincronizar_resultados(app=None, verbose=False):
                             atualizados += 1
                             if verbose:
                                 print(
-                                    f"✅ {time1_nome} {gols_time1}×{gols_time2} {time2_nome}"
+                                    f"✅ {time1_nome} {gols_time1}×{gols_time2} {time2_nome}",
+                                    flush=True,
                                 )
 
             db.session.commit()
 
             if verbose:
-                print(f"🎉 {atualizados} jogos atualizados")
+                print(f"🎉 {atualizados} jogos atualizados", flush=True)
                 if nao_encontrados:
-                    print(f"⚠️  Não encontrados: {', '.join(nao_encontrados)}")
+                    print(
+                        f"⚠️  Não encontrados: {', '.join(nao_encontrados)}",
+                        flush=True,
+                    )
             else:
                 if atualizados > 0:
                     print(
-                        f"[{datetime.now().strftime('%H:%M:%S')}] ✅ {atualizados} jogo(s) atualizado(s)"
+                        f"[{datetime.now().strftime('%H:%M:%S')}] ✅ {atualizados} jogo(s) atualizado(s)",
+                        flush=True,
                     )
 
             return True
 
         except Exception as e:
-            print(f"❌ Erro na sincronização: {e}")
+            print(f"❌ Erro na sincronização: {e}", flush=True)
             import traceback
-
             traceback.print_exc()
             return False
 
 
 if __name__ == "__main__":
     from app import app as flask_app
-
-    sincronizar_resultados(app=flask_app, verbose=True)
+    sincronizar_resultados(app=flask_app, verbose=True, status_filter="IN_PLAY")
