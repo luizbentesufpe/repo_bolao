@@ -18,7 +18,7 @@ import { AuthService } from './core/auth.service';
             <a routerLink="/ranking-jogo" routerLinkActive="ativo">Ranking/Jogo</a>
           </nav>
           <div class="usuario">
-            <span>{{ auth.usuario()?.username }}</span>
+            <span>{{ auth.usuario()?.nome }}</span>
             <button (click)="sair()">Sair</button>
           </div>
         </div>

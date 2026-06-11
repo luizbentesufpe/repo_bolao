@@ -8,9 +8,8 @@ Rodar:
     flask --app app run --debug   # http://localhost:5000
 """
 
-import atexit
 import os
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 from flask import Flask, jsonify, request
 from flask_cors import CORS
@@ -21,7 +20,6 @@ from flask_jwt_extended import (
     jwt_required,
 )
 from models import Aposta, Jogo, User, db
-from scheduler import iniciar_scheduler, parar_scheduler
 
 app = Flask(__name__)
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
@@ -30,7 +28,6 @@ app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv(
     "DATABASE_URL",
     "sqlite:///bolao.db",  # fallback local para desenvolvimento
 )
-
 
 app.config["JWT_SECRET_KEY"] = os.getenv(
     "JWT_SECRET_KEY", "chave-desenvolvimento-insegura"
@@ -45,18 +42,16 @@ CORS(
         r"/api/*": {
             "origins": [
                 "https://bolao-web-0s5h.onrender.com"
-            ],  # COLE A URL DO FRONTEND AQUI
+            ],
             "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
             "allow_headers": ["Content-Type", "Authorization"],
         }
     },
 )
 
-with app.app_context():
-    iniciar_scheduler()
-
-
-atexit.register(lambda: parar_scheduler())
+# Cache para sincronização on-demand
+ultimo_sync = None
+INTERVALO_SYNC = 5  # minutos
 
 
 def erro(msg, status=400):
@@ -115,6 +110,15 @@ def login():
 @app.get("/api/jogos")
 @jwt_required(optional=True)
 def listar_jogos():
+    global ultimo_sync
+    from sync_resultados import sincronizar_resultados
+
+    agora = datetime.now()
+    # Sincroniza apenas se passou INTERVALO_SYNC minutos desde o último sync
+    if ultimo_sync is None or (agora - ultimo_sync).total_seconds() > INTERVALO_SYNC * 60:
+        sincronizar_resultados(app=app, verbose=False, status_filter="IN_PLAY")
+        ultimo_sync = agora
+
     query = Jogo.query.order_by(Jogo.data_hora)
 
     user_id = get_jwt_identity()
@@ -186,34 +190,39 @@ def salvar_aposta():
 def ranking():
     """Mais acertos: pontos totais, placares exatos e apostas pontuadas."""
     tabela = {}
-    for aposta in (
-        Aposta.query.join(Jogo)
-        .filter(Jogo.gols_time1.isnot(None), Jogo.gols_time2.isnot(None))
-        .all()
-    ):
+
+    # Buscar TODAS as apostas (não só as com resultado)
+    for aposta in Aposta.query.all():
+        jogo = aposta.jogo
+
         item = tabela.setdefault(
             aposta.user_id,
             {
-                "nome": aposta.user.nome,  # ✅ Certifique-se que está aqui
+                "nome": aposta.user.nome,
                 "pontos": 0,
                 "exatos": 0,
                 "acertos": 0,
                 "apostas": 0,
             },
         )
-        pts = aposta.pontos()
+
         item["apostas"] += 1
-        item["pontos"] += pts
-        if aposta.exato:
-            item["exatos"] += 1
-        if pts > 0:
-            item["acertos"] += 1
+
+        # Só pontua se o jogo tem resultado
+        if jogo.gols_time1 is not None and jogo.gols_time2 is not None:
+            pts = aposta.pontos()
+            item["pontos"] += pts
+            if aposta.exato:
+                item["exatos"] += 1
+            if pts > 0:
+                item["acertos"] += 1
 
     saida = sorted(
         tabela.values(), key=lambda i: (i["pontos"], i["exatos"]), reverse=True
     )
     for pos, item in enumerate(saida, start=1):
         item["posicao"] = pos
+
     return jsonify(saida)
 
 
@@ -282,8 +291,7 @@ def sync_resultados():
     """Sincroniza resultados com a API football-data.org"""
     from sync_resultados import sincronizar_resultados
 
-    # Você pode adicionar verificação de admin aqui
-    sucesso = sincronizar_resultados(app=app)
+    sucesso = sincronizar_resultados(app=app, verbose=True, status_filter="IN_PLAY")
 
     if sucesso:
         return jsonify(

@@ -1,4 +1,4 @@
-export interface Usuario { id: number; username: string; email: string; }
+export interface Usuario { id: number; nome: string; email: string; }
 
 export interface TimeDto { id: number; nome: string; cidade: string; simbolo: string; }
 
@@ -30,6 +30,6 @@ export interface Aposta {
 export interface ApostasDoJogo { jogo: Jogo; liberado: boolean; apostas: Aposta[]; }
 
 export interface RankingItem {
-  posicao: number; username: string; pontos: number;
+  posicao: number; nome: string; pontos: number;
   exatos: number; acertos: number; apostas: number;
 }
