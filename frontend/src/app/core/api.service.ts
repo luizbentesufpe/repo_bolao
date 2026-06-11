@@ -2,7 +2,7 @@ import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Aposta, ApostasDoJogo, Jogo, RankingItem } from './models';
 import { environment } from '../../environment/environment.prod';
-
+import { Observable } from 'rxjs';
 
 const API = `${environment.apiUrl}/api`;
 
@@ -15,12 +15,16 @@ export class ApiService {
   }
 
   salvarAposta(jogoId: number, g1: number, g2: number) {
-    return this.http.post<Aposta>(`${API}/apostas`,
-      { jogo_id: jogoId, gols_time1: g1, gols_time2: g2 });
+    return this.http.post<Aposta>(`${API}/apostas`, {
+      jogo_id: jogoId,
+      gols_time1: g1,
+      gols_time2: g2
+    });
   }
 
-  apostasDoJogo(jogoId: number) {
-    return this.http.get<ApostasDoJogo>(`${API}/jogos/${jogoId}/apostas`);
+  // ✅ CORRIGIDO
+  apostasDoJogo(jogoId: number): Observable<ApostasDoJogo> {
+    return this.http.get<ApostasDoJogo>(`${API}/apostas-do-jogo/${jogoId}`);
   }
 
   ranking() {
