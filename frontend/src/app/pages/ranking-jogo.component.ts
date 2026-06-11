@@ -64,27 +64,29 @@ import { BandeiraPipe } from '../core/bandeiras.pipe';
             }
           </div>
 
-        <!-- CORTINA COM SEU PALPITE -->
-        @if (usuariosMeusPalpites[jogo.id]) {
-        <div style="position: absolute; inset: 0; background: linear-gradient(135deg, rgba(255, 199, 44, 0.9) 0%, rgba(14, 122, 60, 0.9) 100%); border-radius: 10px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; backdrop-filter: blur(1px);">
-            <span style="font-size: 12px; font-weight: 700; color: rgba(255,255,255,0.8); text-transform: uppercase; letter-spacing: 1px;">Seu palpite</span>
-            <div style="font-size: 28px; font-family: var(--fonte-placar); font-weight: 700; color: white;">
-            {{ usuariosMeusPalpites[jogo.id].gols_time1 }} × {{ usuariosMeusPalpites[jogo.id].gols_time2 }}
+          <!-- CORTINA COM SEU PALPITE -->
+          @if (usuariosMeusPalpites[jogo.id]) {
+            <div style="position: absolute; inset: 0; background: linear-gradient(135deg, rgba(255, 199, 44, 0.9) 0%, rgba(14, 122, 60, 0.9) 100%); border-radius: 10px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; backdrop-filter: blur(1px);">
+              <span style="font-size: 12px; font-weight: 700; color: rgba(255,255,255,0.8); text-transform: uppercase; letter-spacing: 1px;">Seu palpite</span>
+              <div style="font-size: 28px; font-family: var(--fonte-placar); font-weight: 700; color: white;">
+                {{ usuariosMeusPalpites[jogo.id].gols_time1 }} × {{ usuariosMeusPalpites[jogo.id].gols_time2 }}
+              </div>
+              @if (jogo.encerrado && usuariosMeusPalpites[jogo.id].pontos > 0) {
+                <span style="font-size: 14px; font-weight: 700; color: white; background: rgba(0,0,0,0.3); padding: 4px 10px; border-radius: 999px;">
+                  {{ usuariosMeusPalpites[jogo.id].pontos }} pts
+                </span>
+              }
             </div>
-            @if (jogo.encerrado && usuariosMeusPalpites[jogo.id].pontos > 0) {
-            <span style="font-size: 14px; font-weight: 700; color: white; background: rgba(0,0,0,0.3); padding: 4px 10px; border-radius: 999px;">
-                {{ usuariosMeusPalpites[jogo.id].pontos }} pts
-            </span>
-            }
+          } @else {
+            <!-- CORTINA SEM PALPITE -->
+            <div style="position: absolute; inset: 0; background: rgba(0, 0, 0, 0.3); border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; color: white; text-transform: uppercase;">
+              Sem palpite
+            </div>
+          }
         </div>
-        } @else {
-        <!-- CORTINA SEM PALPITE -->
-        <div style="position: absolute; inset: 0; background: rgba(0, 0, 0, 0.3); border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; color: white; text-transform: uppercase;">
-            Sem palpite
-        </div>
-        }
+      }
 
-      <!-- DETALHE DO JOGO SELECIONADO -->
+      <!-- DETALHE DO JOGO SELECIONADO (FORA DO @for) -->
       @if (detalhe) {
         <div style="margin-top: 40px; padding-top: 28px; border-top: 2px solid var(--linha);">
           <h2 style="font-family: var(--fonte-display); margin-bottom: 20px; text-align: center;">Ranking</h2>
