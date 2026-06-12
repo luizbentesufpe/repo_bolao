@@ -53,7 +53,7 @@ import { BandeiraPipe } from '../core/bandeiras.pipe';
                 @if (ehHoje(jogo)) { <span class="tag-hoje">Hoje</span> }
                 <span>{{ jogo.data_hora | date:'HH:mm' }}</span>
                 
-                <!-- CRONOMETRO -->
+                <!-- ✅ CRONOMETRO EM TEMPO REAL -->
                 @if (!jogo.comecou) {
                   <span style="font-weight: 700; color: var(--amarelo);">
                     {{ formatarTempo(getTempo(jogo)) }}
@@ -247,17 +247,24 @@ export class JogosComponent implements OnInit, OnDestroy {
   jogoEmEdicao: Jogo | null = null;
   palpite1: number | null = null;
   palpite2: number | null = null;
-  tempos = new Map<number, string>();
   private intervaloAtualizacao: any;
 
   constructor(private api: ApiService) {}
 
   ngOnInit() {
     this.filtrar('hoje');
+    
+    // ✅ ATUALIZA CRONÔMETRO A CADA 1 SEGUNDO
+    this.intervaloAtualizacao = setInterval(() => {
+      this.dias = [...this.dias];
+    }, 1000);
   }
 
   ngOnDestroy() {
-    clearInterval(this.intervaloAtualizacao);
+    // ✅ LIMPA INTERVAL AO DESMONTAR
+    if (this.intervaloAtualizacao) {
+      clearInterval(this.intervaloAtualizacao);
+    }
   }
 
   filtrar(periodo: 'hoje' | 'semana' | 'todos') {
@@ -305,6 +312,7 @@ export class JogosComponent implements OnInit, OnDestroy {
     return new Date(jogo.data_hora).toDateString() === new Date().toDateString();
   }
 
+  // ✅ CALCULA TEMPO RESTANTE EM TEMPO REAL
   getTempo(jogo: Jogo): number {
     const agora = new Date().getTime();
     const inicio = new Date(jogo.data_hora).getTime();
@@ -325,7 +333,6 @@ export class JogosComponent implements OnInit, OnDestroy {
   }
 
   estaAberto(jogo: Jogo): boolean {
-    // Calcula dinamicamente se o jogo ainda está aberto para apostas
     const agora = new Date().getTime();
     const inicio = new Date(jogo.data_hora).getTime();
     return agora < inicio;
@@ -346,7 +353,6 @@ export class JogosComponent implements OnInit, OnDestroy {
   confirmarAposta(jogo: Jogo) {
     if (this.palpite1 === null || this.palpite2 === null) return;
     
-    // Valida se o jogo ainda está aberto
     if (!this.estaAberto(jogo)) {
       alert('Apostas encerradas: o jogo já começou.');
       this.cancelarAposta();

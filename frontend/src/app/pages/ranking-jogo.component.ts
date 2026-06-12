@@ -222,7 +222,8 @@ export class RankingJogoComponent implements OnInit, OnDestroy {
         jogos = jogos.filter(j => j.comecou && !j.encerrado);
         break;
       case 'em-breve':
-        jogos = jogos.filter(j => !j.comecou);
+        // ✅ CORRIGIDO: APENAS JOGOS NÃO INICIADOS E NÃO ENCERRADOS
+        jogos = jogos.filter(j => !j.comecou && !j.encerrado);
         break;
       default:
         jogos = jogos;
