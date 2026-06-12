@@ -104,7 +104,7 @@ class Jogo(db.Model):
 
     @property
     def comecou(self):
-        return self.status_api in ["LIVE", "IN_PLAY", "FINISHED"]
+        return self.status_api in ["LIVE", "IN_PLAY", "PAUSED", "SUSPENDED", "FINISHED"]
 
     def to_dict(self):
         return {

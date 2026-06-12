@@ -116,11 +116,21 @@ def sincronizar_resultados(app=None, verbose=True, status_filter="IN_PLAY"):
                     nao_encontrados.append(f"{time1_nome} vs {time2_nome}")
                     continue
 
-                # Se o jogo tem resultado
-                if match["status"] in ["FINISHED", "LIVE"]:
+                # ✅ SEMPRE atualiza o status_api
+                jogo.status_api = match["status"]
+
+                # ✅ Se tem resultado, atualiza os gols
+                if match["status"] in ["FINISHED", "LIVE", "IN_PLAY", "PAUSED", "SUSPENDED"]:
                     score = match.get("score", {})
+                    
+                    # Tenta fullTime, depois halfTime (para LIVE matches)
                     gols_time1 = score.get("fullTime", {}).get("home")
                     gols_time2 = score.get("fullTime", {}).get("away")
+                    
+                    # Se não tem fullTime (jogo ao vivo), usa o score atual
+                    if gols_time1 is None or gols_time2 is None:
+                        gols_time1 = score.get("halfTime", {}).get("home") or gols_time1
+                        gols_time2 = score.get("halfTime", {}).get("away") or gols_time2
 
                     if gols_time1 is not None and gols_time2 is not None:
                         if (
@@ -132,7 +142,7 @@ def sincronizar_resultados(app=None, verbose=True, status_filter="IN_PLAY"):
                             atualizados += 1
                             if verbose:
                                 print(
-                                    f"✅ {time1_nome} {gols_time1}×{gols_time2} {time2_nome}",
+                                    f"✅ {time1_nome} {gols_time1}×{gols_time2} {time2_nome} [{match['status']}]",
                                     flush=True,
                                 )
 

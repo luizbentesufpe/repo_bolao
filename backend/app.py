@@ -47,7 +47,7 @@ CORS(
     },
 )
 
-# Cache para sincronização on-demand
+# ✅ Cache para sincronização on-demand
 ultimo_sync = None
 INTERVALO_SYNC = 5  # minutos
 
@@ -146,7 +146,7 @@ def listar_jogos():
 
     agora = datetime.now()
 
-    # Sincroniza apenas se passou INTERVALO_SYNC minutos desde o último sync
+    # ✅ Sincroniza apenas se passou INTERVALO_SYNC minutos desde o último sync
     if (
         ultimo_sync is None
         or (agora - ultimo_sync).total_seconds() > INTERVALO_SYNC * 60
