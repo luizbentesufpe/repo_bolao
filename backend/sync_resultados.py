@@ -117,6 +117,7 @@ def sincronizar_resultados(app=None, verbose=True, status_filter="IN_PLAY"):
                     continue
 
                 # ✅ SEMPRE atualiza o status_api
+                status_antigo = jogo.status_api
                 jogo.status_api = match["status"]
 
                 # ✅ Se tem resultado, atualiza os gols
@@ -136,13 +137,14 @@ def sincronizar_resultados(app=None, verbose=True, status_filter="IN_PLAY"):
                         if (
                             jogo.gols_time1 != gols_time1
                             or jogo.gols_time2 != gols_time2
+                            or status_antigo != jogo.status_api  # ✅ NOVO: detecta mudança de status
                         ):
                             jogo.gols_time1 = gols_time1
                             jogo.gols_time2 = gols_time2
                             atualizados += 1
                             if verbose:
                                 print(
-                                    f"✅ {time1_nome} {gols_time1}×{gols_time2} {time2_nome} [{match['status']}]",
+                                    f"✅ {time1_nome} {gols_time1}×{gols_time2} {time2_nome} [{status_antigo} → {match['status']}]",
                                     flush=True,
                                 )
 
