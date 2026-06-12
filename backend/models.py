@@ -111,7 +111,11 @@ class Jogo(db.Model):
 
     @property
     def encerrado(self):
-        return self.gols_time1 is not None and self.gols_time2 is not None
+        return (
+            self.status_api in ["FINISHED", "CLOSED"]
+            and self.gols_time1 is not None
+            and self.gols_time2 is not None
+        )
 
     @property
     def comecou(self):
