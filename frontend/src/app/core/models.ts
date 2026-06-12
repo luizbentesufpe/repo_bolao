@@ -14,6 +14,9 @@ export interface Jogo {
   cidade_estado: string;
   encerrado: boolean;
   comecou: boolean;
+  em_breve: boolean;
+  ao_vivo: boolean;
+
   minha_aposta: Aposta | null;
 }
 

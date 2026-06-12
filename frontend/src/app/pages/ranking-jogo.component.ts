@@ -6,6 +6,32 @@ import { Jogo, ApostasDoJogo } from '../core/models';
 import { AuthService } from '../core/auth.service';
 import { BandeiraPipe } from '../core/bandeiras.pipe';
 
+// ✅ FUNÇÃO PARA CALCULAR PONTOS PREVISTO
+function calcularPontosPrevisto(aposta: any, placarAtual: { gols_time1: number | null; gols_time2: number | null }): number {
+  if (aposta.gols_time1 === null || aposta.gols_time2 === null) return 0;
+  if (placarAtual.gols_time1 === null || placarAtual.gols_time2 === null) return 0;
+
+  // EXATO
+  if (aposta.gols_time1 === placarAtual.gols_time1 && aposta.gols_time2 === placarAtual.gols_time2) {
+    return 5;
+  }
+
+  // VENCEDOR/EMPATE
+  const apostaSaldo = aposta.gols_time1 - aposta.gols_time2;
+  const placarSaldo = placarAtual.gols_time1 - placarAtual.gols_time2;
+
+  if ((apostaSaldo > 0 && placarSaldo > 0) || (apostaSaldo < 0 && placarSaldo < 0) || (apostaSaldo === 0 && placarSaldo === 0)) {
+    return 2;
+  }
+
+  // 1 GOL CORRETO
+  if (aposta.gols_time1 === placarAtual.gols_time1 || aposta.gols_time2 === placarAtual.gols_time2) {
+    return 1;
+  }
+
+  return 0;
+}
+
 @Component({
   selector: 'app-ranking-jogo',
   standalone: true,
@@ -68,11 +94,12 @@ import { BandeiraPipe } from '../core/bandeiras.pipe';
               <div class="jogo-meta">
                 {{ jogo.data_hora | date:'dd/MM HH:mm' }}
                 
+                <!-- ✅ STATUS CORRETO -->
                 @if (jogo.encerrado) {
                   <span style="color: var(--campo); font-weight: 700; text-transform: uppercase; font-size: 11px;">✓ Encerrado</span>
-                } @else if (jogo.comecou) {
+                } @else if (jogo.ao_vivo) {
                   <span style="color: var(--vermelho); font-weight: 700; text-transform: uppercase; font-size: 11px;">⚽ Ao vivo</span>
-                } @else {
+                } @else if (jogo.em_breve) {
                   <span style="color: #999; font-weight: 700; text-transform: uppercase; font-size: 11px;">📅 Em breve</span>
                 }
               </div>
@@ -84,6 +111,7 @@ import { BandeiraPipe } from '../core/bandeiras.pipe';
                   <div style="font-size: 28px; font-family: var(--fonte-placar); font-weight: 700; color: white;">
                     {{ usuariosMeusPalpites[jogo.id].gols_time1 }} × {{ usuariosMeusPalpites[jogo.id].gols_time2 }}
                   </div>
+                  <!-- ✅ SÓ MOSTRA PONTOS SE ENCERRADO -->
                   @if (jogo.encerrado && usuariosMeusPalpites[jogo.id].pontos > 0) {
                     <span style="font-size: 14px; font-weight: 700; color: white; background: rgba(0,0,0,0.3); padding: 4px 10px; border-radius: 999px;">
                       {{ usuariosMeusPalpites[jogo.id].pontos }} pts
@@ -113,13 +141,13 @@ import { BandeiraPipe } from '../core/bandeiras.pipe';
                 Palpites - {{ detalhe.jogo.time1.nome }} × {{ detalhe.jogo.time2.nome }}
               </h3>
               
-              <!-- STATUS DO JOGO -->
+              <!-- ✅ STATUS DO JOGO -->
               <div style="text-align: center; margin-bottom: 16px;">
                 @if (detalhe.jogo.encerrado) {
                   <span style="background: var(--campo); color: white; padding: 6px 12px; border-radius: 999px; font-size: 12px; font-weight: 700; text-transform: uppercase; display: inline-block;">✓ Encerrado</span>
-                } @else if (detalhe.jogo.comecou) {
+                } @else if (detalhe.jogo.ao_vivo) {
                   <span style="background: var(--vermelho); color: white; padding: 6px 12px; border-radius: 999px; font-size: 12px; font-weight: 700; text-transform: uppercase; display: inline-block;">⚽ Ao vivo</span>
-                } @else {
+                } @else if (detalhe.jogo.em_breve) {
                   <span style="background: #999; color: white; padding: 6px 12px; border-radius: 999px; font-size: 12px; font-weight: 700; text-transform: uppercase; display: inline-block;">📅 Em breve</span>
                 }
               </div>
@@ -127,6 +155,10 @@ import { BandeiraPipe } from '../core/bandeiras.pipe';
               @if (detalhe.jogo.encerrado) {
                 <div style="background: var(--campo); color: white; padding: 8px 12px; border-radius: 6px; margin-bottom: 16px; text-align: center; font-weight: 700;">
                   🏆 Resultado: {{ detalhe.jogo.gols_time1 }} × {{ detalhe.jogo.gols_time2 }}
+                </div>
+              } @else if (detalhe.jogo.ao_vivo && detalhe.jogo.gols_time1 !== null && detalhe.jogo.gols_time2 !== null) {
+                <div style="background: #ff9800; color: white; padding: 8px 12px; border-radius: 6px; margin-bottom: 16px; text-align: center; font-weight: 700;">
+                  ⏱️ Placar atual: {{ detalhe.jogo.gols_time1 }} × {{ detalhe.jogo.gols_time2 }} (Pontuação prevista abaixo)
                 </div>
               }
               
@@ -163,9 +195,14 @@ import { BandeiraPipe } from '../core/bandeiras.pipe';
                           }
                         </div>
                         
+                        <!-- ✅ PONTOS REAL (SE ENCERRADO) OU PREVISTO (EM ANDAMENTO) -->
                         @if (detalhe.jogo.encerrado) {
                           <div style="font-weight: 700; color: var(--campo); min-width: 50px; background: #fff8e1; padding: 4px 8px; border-radius: 4px; text-align: center;">
                             {{ aposta.pontos }}pts
+                          </div>
+                        } @else if (detalhe.jogo.ao_vivo && detalhe.jogo.gols_time1 !== null && detalhe.jogo.gols_time2 !== null) {
+                          <div style="font-weight: 700; color: #ff9800; min-width: 50px; background: #fff3e0; padding: 4px 8px; border-radius: 4px; text-align: center; border: 1px dashed #ff9800;">
+                            {{ calcularPrevisto(aposta) }}pts*
                           </div>
                         }
                       </div>
@@ -211,6 +248,15 @@ export class RankingJogoComponent implements OnInit, OnDestroy {
 
   ngOnDestroy() {}
 
+  // ✅ FUNÇÃO PARA CALCULAR PONTOS PREVISTO
+  calcularPrevisto(aposta: any): number {
+    if (!this.detalhe) return 0;
+    return calcularPontosPrevisto(aposta, {
+      gols_time1: this.detalhe.jogo.gols_time1,
+      gols_time2: this.detalhe.jogo.gols_time2
+    });
+  }
+
   atualizarLista() {
     let jogos = this.jogos;
     
@@ -219,11 +265,10 @@ export class RankingJogoComponent implements OnInit, OnDestroy {
         jogos = jogos.filter(j => j.encerrado);
         break;
       case 'ao-vivo':
-        jogos = jogos.filter(j => j.comecou && !j.encerrado);
+        jogos = jogos.filter(j => j.ao_vivo);
         break;
       case 'em-breve':
-        // ✅ CORRIGIDO: APENAS JOGOS NÃO INICIADOS E NÃO ENCERRADOS
-        jogos = jogos.filter(j => !j.comecou && !j.encerrado);
+        jogos = jogos.filter(j => j.em_breve);
         break;
       default:
         jogos = jogos;

@@ -97,6 +97,36 @@ def calcular_pontos(aposta, jogo):
     return 0
 
 
+# ========================================== FUNÇÃO PARA RECALCULAR PONTOS
+def recalcular_pontos_jogo(jogo):
+    """Recalcula pontos quando jogo termina (status = FINISHED)"""
+    
+    if not jogo.encerrado:
+        return
+    
+    apostas = Aposta.query.filter_by(jogo_id=jogo.id).all()
+    
+    for aposta in apostas:
+        # EXATO
+        if aposta.gols_time1 == jogo.gols_time1 and aposta.gols_time2 == jogo.gols_time2:
+            aposta.pontos = 5
+        else:
+            # VENCEDOR/EMPATE
+            aposta_resultado = "time1" if aposta.gols_time1 > aposta.gols_time2 else \
+                              "time2" if aposta.gols_time1 < aposta.gols_time2 else "empate"
+            
+            jogo_resultado = "time1" if jogo.gols_time1 > jogo.gols_time2 else \
+                            "time2" if jogo.gols_time1 < jogo.gols_time2 else "empate"
+            
+            if aposta_resultado == jogo_resultado:
+                aposta.pontos = 2
+            # 1 GOL CORRETO
+            elif aposta.gols_time1 == jogo.gols_time1 or aposta.gols_time2 == jogo.gols_time2:
+                aposta.pontos = 1
+            else:
+                aposta.pontos = 0
+
+
 # ---------------------------------------------------------------- AUTENTICACAO
 @app.post("/api/auth/register")
 def register():
@@ -182,11 +212,18 @@ def listar_jogos():
         }
 
     saida = []
+    
+    # ✅ RECALCULAR PONTOS PARA JOGOS FINALIZADOS
     for jogo in query.all():
+        if jogo.encerrado:
+            recalcular_pontos_jogo(jogo)
+        
         d = jogo.to_dict()
         aposta = minhas.get(jogo.id)
         d["minha_aposta"] = aposta.to_dict() if aposta else None
         saida.append(d)
+    
+    db.session.commit()
     return jsonify(saida)
 
 
@@ -380,9 +417,6 @@ def sync_resultados():
         ), 200
     else:
         return jsonify({"ok": False, "erro": "Falha ao sincronizar"}), 500
-
-
-# Adicione este endpoint ao seu app.py (antes do if __name__):
 
 
 @app.post("/api/auth/atualizar-perfil")

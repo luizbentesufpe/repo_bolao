@@ -62,6 +62,15 @@ import { BandeiraPipe } from '../core/bandeiras.pipe';
                   <span style="color: var(--vermelho); font-weight: 700;">⚽ AO VIVO</span>
                 }
 
+                <!-- ✅ STATUS CORRETO -->
+                @if (jogo.encerrado) {
+                  <span style="color: var(--campo); font-weight: 700; text-transform: uppercase; font-size: 11px;">✓ Finalizado</span>
+                } @else if (jogo.ao_vivo) {
+                  <span style="color: var(--vermelho); font-weight: 700; text-transform: uppercase; font-size: 11px;">🔴 Ao vivo</span>
+                } @else if (jogo.em_breve) {
+                  <span style="color: #999; font-weight: 700; text-transform: uppercase; font-size: 11px;">⏰ Em breve</span>
+                }
+
                 <span>{{ jogo.estadio }}</span>
 
                 @if (jogo.minha_aposta && jogo.minha_aposta.gols_time1 !== null && jogo.minha_aposta.gols_time2 !== null) { 

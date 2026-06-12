@@ -99,6 +99,17 @@ class Jogo(db.Model):
         return "%s x %s" % (self.time1.nome, self.time2.nome)
 
     @property
+    def em_breve(self):
+        """Jogo não começou ainda"""
+        return self.status_api in ["TIMED"]
+    
+    @property
+    def ao_vivo(self):
+        """Jogo está em andamento"""
+        return self.status_api in ["LIVE", "IN_PLAY", "PAUSED", "SUSPENDED"]
+
+
+    @property
     def encerrado(self):
         return self.gols_time1 is not None and self.gols_time2 is not None
 
@@ -117,6 +128,8 @@ class Jogo(db.Model):
             "gols_time2": self.gols_time2,
             "estadio": self.estadio,
             "cidade_estado": self.cidade_estado,
+            "em_breve": self.em_breve,
+            "ao_vivo": self.ao_vivo,
             "encerrado": self.encerrado,
             "comecou": self.comecou,
         }
