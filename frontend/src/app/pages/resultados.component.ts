@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { ApiService } from '../core/api.service';
 import { ApostasDoJogo, Jogo } from '../core/models';
 import { AuthService } from '../core/auth.service';
+import { SincronizacaoService } from '../core/sincronizacao.service';
 
 @Component({
   selector: 'app-resultados',
@@ -73,11 +74,12 @@ export class ResultadosComponent implements OnInit {
   detalhe: ApostasDoJogo | null = null;
   meuEmail = '';
 
-  constructor(private api: ApiService, auth: AuthService) {
+  constructor(private api: ApiService, auth: AuthService, private sincronizacaoService: SincronizacaoService) {
     this.meuEmail = auth.usuario()?.email ?? '';
   }
 
   ngOnInit() {
+    this.sincronizacaoService.sincronizar();
     this.api.jogos('todos').subscribe(jogos => (this.jogos = jogos));
   }
 

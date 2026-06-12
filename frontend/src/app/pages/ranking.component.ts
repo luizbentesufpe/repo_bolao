@@ -2,6 +2,7 @@ import { Component, OnInit } from '@angular/core';
 import { ApiService } from '../core/api.service';
 import { RankingItem } from '../core/models';
 import { AuthService } from '../core/auth.service';
+import { SincronizacaoService } from '../core/sincronizacao.service';
 
 @Component({
   selector: 'app-ranking',
@@ -68,11 +69,12 @@ export class RankingComponent implements OnInit {
   peFreio: string = '';
   jogoConcluido = 0;  // ✅ Contar jogos concluídos
 
-  constructor(private api: ApiService, auth: AuthService) {
+  constructor(private api: ApiService, private sincronizacaoService: SincronizacaoService, auth: AuthService) {
     this.meuNome = auth.usuario()?.nome ?? '';
   }
 
   ngOnInit() {
+    this.sincronizacaoService.sincronizar();
     this.api.ranking().subscribe(itens => {
       this.itens = itens;
 

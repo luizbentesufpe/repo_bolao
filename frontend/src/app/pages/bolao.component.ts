@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { ApiService } from '../core/api.service';
 import { Jogo } from '../core/models';
 import { BandeiraPipe } from '../core/bandeiras.pipe';
+import { SincronizacaoService } from '../core/sincronizacao.service';
 
 interface JogoComPalpite extends Jogo {
   palpite1: number | null;
@@ -255,9 +256,10 @@ export class BolaoComponent implements OnInit, OnDestroy {
   }[] = [];
   carregando = true;
 
-  constructor(private api: ApiService) { }
+  constructor(private api: ApiService, private sincronizacaoService: SincronizacaoService) { }
 
   ngOnInit() {
+    this.sincronizacaoService.sincronizar();
     this.carregarJogos();
   }
 

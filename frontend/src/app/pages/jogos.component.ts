@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { ApiService } from '../core/api.service';
 import { Jogo } from '../core/models';
 import { BandeiraPipe } from '../core/bandeiras.pipe';
+import { SincronizacaoService } from '../core/sincronizacao.service';
 
 @Component({
   selector: 'app-jogos',
@@ -258,9 +259,10 @@ export class JogosComponent implements OnInit, OnDestroy {
   palpite2: number | null = null;
   private intervaloAtualizacao: any;
 
-  constructor(private api: ApiService) {}
-
+  constructor(private api: ApiService, private sincronizacaoService: SincronizacaoService) {}
+  
   ngOnInit() {
+    this.sincronizacaoService.sincronizar();
     this.filtrar('hoje');
     
     // ✅ ATUALIZA CRONÔMETRO A CADA 1 SEGUNDO

@@ -20,6 +20,7 @@ from flask_jwt_extended import (
     jwt_required,
 )
 from models import Aposta, Jogo, User, db
+from sync_knockout import seed_knockout_matches
 
 app = Flask(__name__)
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
@@ -208,7 +209,9 @@ def listar_jogos():
         print(
             f"[{agora.strftime('%H:%M:%S')}] 🔄 Sincronizando placares...", flush=True
         )
-        sincronizar_resultados(app=app, verbose=False, status_filter="IN_PLAY")
+        sincronizar_resultados(app=app, verbose=False, status_filter=None)
+        print(f"[{agora.strftime('%H:%M:%S')}] 🎯 Populando mata-mata...", flush=True)
+        seed_knockout_matches(app=app, verbose=False)
         ultimo_sync = agora
         print(f"[{agora.strftime('%H:%M:%S')}] ✅ Sincronização concluída!", flush=True)
     else:

@@ -5,6 +5,7 @@ import { ApiService } from '../core/api.service';
 import { Jogo, ApostasDoJogo } from '../core/models';
 import { AuthService } from '../core/auth.service';
 import { BandeiraPipe } from '../core/bandeiras.pipe';
+import { SincronizacaoService } from '../core/sincronizacao.service';
 
 // ✅ FUNÇÃO PARA CALCULAR PONTOS PREVISTO
 function calcularPontosPrevisto(aposta: any, placarAtual: { gols_time1: number | null; gols_time2: number | null }): number {
@@ -237,11 +238,12 @@ export class RankingJogoComponent implements OnInit, OnDestroy {
   usuariosMeusPalpites: { [key: number]: any } = {};
   jogoComPalpitesAberto: number | null = null;
 
-  constructor(private api: ApiService, auth: AuthService) {
+  constructor(private api: ApiService, private sincronizacaoService: SincronizacaoService, auth: AuthService) {
     this.meuEmail = auth.usuario()?.email ?? '';
   }
 
   ngOnInit() {
+    this.sincronizacaoService.sincronizar();
     this.carregarDados();
     this.atualizarLista();
   }
