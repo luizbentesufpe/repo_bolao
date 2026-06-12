@@ -40,6 +40,20 @@ export class AuthService {
     return this.http.post<{ ok: boolean; msg: string }>(`${API}/auth/resetar-senha`, { nova_senha: novaSenha });
   }
 
+  // ✅ NOVO: Atualizar perfil
+  atualizarPerfil(dados: { nome: string }) {
+    return this.http.post<{ ok: boolean; user: Usuario }>(`${API}/auth/atualizar-perfil`, dados)
+      .pipe(tap(r => {
+        this.usuario.set(r.user);
+        localStorage.setItem('bolao_user', JSON.stringify(r.user));
+      }));
+  }
+
+  // ✅ Método auxiliar para atualizar usuário no signal
+  atualizarUsuario(user: Usuario) {
+    this.usuario.set(user);
+    localStorage.setItem('bolao_user', JSON.stringify(user));
+  }
 
   private guardar(r: AuthResposta) {
     localStorage.setItem('bolao_token', r.token);

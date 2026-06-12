@@ -22,12 +22,19 @@ export class ApiService {
     });
   }
 
-  // ✅ CORRIGIDO
   apostasDoJogo(jogoId: number): Observable<ApostasDoJogo> {
     return this.http.get<ApostasDoJogo>(`${API}/apostas-do-jogo/${jogoId}`);
   }
 
   ranking() {
     return this.http.get<RankingItem[]>(`${API}/ranking`);
+  }
+
+  // ✅ NOVO: Salvar resultado (admin)
+  salvarResultado(jogoId: number, gols_time1: number, gols_time2: number) {
+    return this.http.post(`${API}/jogos/${jogoId}/resultado`, {
+      gols_time1,
+      gols_time2
+    });
   }
 }

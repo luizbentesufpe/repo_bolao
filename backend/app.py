@@ -67,25 +67,33 @@ def calcular_pontos(aposta, jogo):
     """
     if aposta.gols_time1 is None or aposta.gols_time2 is None:
         return 0
-    
+
     if jogo.gols_time1 is None or jogo.gols_time2 is None:
         return 0
-    
+
     # Placar exato
     if aposta.gols_time1 == jogo.gols_time1 and aposta.gols_time2 == jogo.gols_time2:
         return 5
-    
+
     # Vencedor ou empate
-    meu_resultado = "empate" if aposta.gols_time1 == aposta.gols_time2 else ("time1" if aposta.gols_time1 > aposta.gols_time2 else "time2")
-    real_resultado = "empate" if jogo.gols_time1 == jogo.gols_time2 else ("time1" if jogo.gols_time1 > jogo.gols_time2 else "time2")
-    
+    meu_resultado = (
+        "empate"
+        if aposta.gols_time1 == aposta.gols_time2
+        else ("time1" if aposta.gols_time1 > aposta.gols_time2 else "time2")
+    )
+    real_resultado = (
+        "empate"
+        if jogo.gols_time1 == jogo.gols_time2
+        else ("time1" if jogo.gols_time1 > jogo.gols_time2 else "time2")
+    )
+
     if meu_resultado == real_resultado:
         return 2
-    
+
     # Gols de uma equipe
     if aposta.gols_time1 == jogo.gols_time1 or aposta.gols_time2 == jogo.gols_time2:
         return 1
-    
+
     return 0
 
 
@@ -190,8 +198,8 @@ def apostas_do_jogo(jogo_id):
 
     # ✅ ORDENA POR COLUNA PONTOS (não calcula dinamicamente)
     apostas = Aposta.query.filter_by(jogo_id=jogo_id).all()
-    apostas_sorted = sorted(apostas, key=lambda a: (a.pontos or 0), reverse=True)
-    
+    apostas_sorted = sorted(apostas, key=lambda a: a.pontos or 0, reverse=True)
+
     return jsonify(
         {
             "jogo": jogo.to_dict(),
@@ -227,13 +235,13 @@ def salvar_aposta():
     if aposta is None:
         aposta = Aposta(jogo_id=jogo.id, user_id=user_id)
         db.session.add(aposta)
-    
+
     aposta.gols_time1 = g1
     aposta.gols_time2 = g2
-    
+
     # ✅ CALCULA E ARMAZENA PONTOS NA COLUNA
     aposta.pontos = calcular_pontos(aposta, jogo)
-    
+
     db.session.commit()
     return jsonify(aposta.to_dict()), 200
 
@@ -267,9 +275,12 @@ def ranking():
             item["pontos"] += aposta.pontos
             item["acertos"] += 1
             item["apostas_pontuadas"] += 1
-        
+
         # Conta exatos
-        if aposta.gols_time1 == jogo.gols_time1 and aposta.gols_time2 == jogo.gols_time2:
+        if (
+            aposta.gols_time1 == jogo.gols_time1
+            and aposta.gols_time2 == jogo.gols_time2
+        ):
             item["exatos"] += 1
 
     saida = sorted(
@@ -354,6 +365,29 @@ def sync_resultados():
         ), 200
     else:
         return jsonify({"ok": False, "erro": "Falha ao sincronizar"}), 500
+
+
+# Adicione este endpoint ao seu app.py (antes do if __name__):
+
+
+@app.post("/api/auth/atualizar-perfil")
+@jwt_required()
+def atualizar_perfil():
+    """Atualiza o perfil do usuario logado (nome)."""
+    user_id = int(get_jwt_identity())
+    dados = request.get_json(silent=True) or {}
+    nome = (dados.get("nome") or "").strip()
+
+    if not nome:
+        return erro("Nome não pode estar vazio.")
+
+    user = User.query.get(user_id)
+    user.nome = nome
+    db.session.commit()
+
+    return jsonify(
+        {"ok": True, "user": {"id": user.id, "nome": user.nome, "email": user.email}}
+    ), 200
 
 
 if __name__ == "__main__":

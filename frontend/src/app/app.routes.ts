@@ -7,6 +7,8 @@ import { ResultadosComponent } from './pages/resultados.component';
 import { RankingComponent } from './pages/ranking.component';
 import { ResetSenhaComponent } from './pages/reset-senha.component';
 import { RankingJogoComponent } from './pages/ranking-jogo.component';
+import { PerfilComponent } from './pages/perfil.component';
+import { AdminPlacaresComponent } from './pages/admin_placar.component';
 
 
 export const routes: Routes = [
@@ -17,6 +19,8 @@ export const routes: Routes = [
   { path: 'resultados', component: ResultadosComponent, canActivate: [authGuard] },
   { path: 'ranking', component: RankingComponent, canActivate: [authGuard] },
   { path: 'ranking-jogo', component: RankingJogoComponent, canActivate: [authGuard] },
+  {path: 'perfil',  component: PerfilComponent,  canActivate: [authGuard]},
+  { path: 'admin-placares', component: AdminPlacaresComponent, canActivate: [authGuard] },
   { path: '', pathMatch: 'full', redirectTo: 'jogos' },
   { path: '**', redirectTo: 'jogos' },
 ];
