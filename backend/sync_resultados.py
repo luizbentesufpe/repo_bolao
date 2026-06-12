@@ -2,9 +2,11 @@
 """
 Sincroniza resultados com a API football-data.org
 """
+
 import os
-import requests
 from datetime import datetime
+
+import requests
 
 API_KEY = os.getenv("FOOTBALL_DATA_API_KEY", "")
 BASE_URL = "https://api.football-data.org/v4"
@@ -66,10 +68,11 @@ def traduzir_time(nome_ingles):
     return traducoes.get(nome_ingles, nome_ingles)
 
 
-def sincronizar_resultados(app=None, verbose=True, status_filter="IN_PLAY"):
+def sincronizar_resultados(app=None, verbose=True, status_filter=None):
     """Sincroniza resultados com a API football-data.org"""
     if app is None:
         from app import app as flask_app
+
         app = flask_app
 
     with app.app_context():
@@ -121,13 +124,19 @@ def sincronizar_resultados(app=None, verbose=True, status_filter="IN_PLAY"):
                 jogo.status_api = match["status"]
 
                 # ✅ Se tem resultado, atualiza os gols
-                if match["status"] in ["FINISHED", "LIVE", "IN_PLAY", "PAUSED", "SUSPENDED"]:
+                if match["status"] in [
+                    "FINISHED",
+                    "LIVE",
+                    "IN_PLAY",
+                    "PAUSED",
+                    "SUSPENDED",
+                ]:
                     score = match.get("score", {})
-                    
+
                     # Tenta fullTime, depois halfTime (para LIVE matches)
                     gols_time1 = score.get("fullTime", {}).get("home")
                     gols_time2 = score.get("fullTime", {}).get("away")
-                    
+
                     # Se não tem fullTime (jogo ao vivo), usa o score atual
                     if gols_time1 is None or gols_time2 is None:
                         gols_time1 = score.get("halfTime", {}).get("home") or gols_time1
@@ -137,7 +146,8 @@ def sincronizar_resultados(app=None, verbose=True, status_filter="IN_PLAY"):
                         if (
                             jogo.gols_time1 != gols_time1
                             or jogo.gols_time2 != gols_time2
-                            or status_antigo != jogo.status_api  # ✅ NOVO: detecta mudança de status
+                            or status_antigo
+                            != jogo.status_api  # ✅ NOVO: detecta mudança de status
                         ):
                             jogo.gols_time1 = gols_time1
                             jogo.gols_time2 = gols_time2
@@ -169,10 +179,15 @@ def sincronizar_resultados(app=None, verbose=True, status_filter="IN_PLAY"):
         except Exception as e:
             print(f"❌ Erro na sincronização: {e}", flush=True)
             import traceback
+
             traceback.print_exc()
             return False
 
 
 if __name__ == "__main__":
     from app import app as flask_app
-    sincronizar_resultados(app=flask_app, verbose=True, status_filter="IN_PLAY")
+
+    sincronizar_resultados(
+        app=flask_app,
+        verbose=True,
+    )
