@@ -9,8 +9,9 @@ export class SincronizacaoService {
   constructor(private http: HttpClient) {}
 
   sincronizar(): void {
+    const API = `${environment.apiUrl}/api`;
     // Fetch silencioso (não bloqueia)
-    this.http.get<any>(`${environment.apiUrl}/jogos`).subscribe(
+    this.http.get<any>(`${API}/jogos`).subscribe(
       (jogos) => {
         console.log('✅ Sincronização concluída!', jogos.length, 'jogos');
       },
