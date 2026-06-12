@@ -68,7 +68,7 @@ def traduzir_time(nome_ingles):
     return traducoes.get(nome_ingles, nome_ingles)
 
 
-def sincronizar_resultados(app=None, verbose=True, status_filter=None):
+def sincronizar_resultados(app=None, verbose=True, status_filter="IN_PLAY"):
     """Sincroniza resultados com a API football-data.org"""
     if app is None:
         from app import app as flask_app
@@ -187,7 +187,4 @@ def sincronizar_resultados(app=None, verbose=True, status_filter=None):
 if __name__ == "__main__":
     from app import app as flask_app
 
-    sincronizar_resultados(
-        app=flask_app,
-        verbose=True,
-    )
+    sincronizar_resultados(app=flask_app, verbose=True, status_filter=None)

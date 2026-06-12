@@ -100,28 +100,44 @@ def calcular_pontos(aposta, jogo):
 # ========================================== FUNÇÃO PARA RECALCULAR PONTOS
 def recalcular_pontos_jogo(jogo):
     """Recalcula pontos quando jogo termina (status = FINISHED)"""
-    
+
     if not jogo.encerrado:
         return
-    
+
     apostas = Aposta.query.filter_by(jogo_id=jogo.id).all()
-    
+
     for aposta in apostas:
         # EXATO
-        if aposta.gols_time1 == jogo.gols_time1 and aposta.gols_time2 == jogo.gols_time2:
+        if (
+            aposta.gols_time1 == jogo.gols_time1
+            and aposta.gols_time2 == jogo.gols_time2
+        ):
             aposta.pontos = 5
         else:
             # VENCEDOR/EMPATE
-            aposta_resultado = "time1" if aposta.gols_time1 > aposta.gols_time2 else \
-                              "time2" if aposta.gols_time1 < aposta.gols_time2 else "empate"
-            
-            jogo_resultado = "time1" if jogo.gols_time1 > jogo.gols_time2 else \
-                            "time2" if jogo.gols_time1 < jogo.gols_time2 else "empate"
-            
+            aposta_resultado = (
+                "time1"
+                if aposta.gols_time1 > aposta.gols_time2
+                else "time2"
+                if aposta.gols_time1 < aposta.gols_time2
+                else "empate"
+            )
+
+            jogo_resultado = (
+                "time1"
+                if jogo.gols_time1 > jogo.gols_time2
+                else "time2"
+                if jogo.gols_time1 < jogo.gols_time2
+                else "empate"
+            )
+
             if aposta_resultado == jogo_resultado:
                 aposta.pontos = 2
             # 1 GOL CORRETO
-            elif aposta.gols_time1 == jogo.gols_time1 or aposta.gols_time2 == jogo.gols_time2:
+            elif (
+                aposta.gols_time1 == jogo.gols_time1
+                or aposta.gols_time2 == jogo.gols_time2
+            ):
                 aposta.pontos = 1
             else:
                 aposta.pontos = 0
@@ -212,17 +228,17 @@ def listar_jogos():
         }
 
     saida = []
-    
+
     # ✅ RECALCULAR PONTOS PARA JOGOS FINALIZADOS
     for jogo in query.all():
         if jogo.encerrado:
             recalcular_pontos_jogo(jogo)
-        
+
         d = jogo.to_dict()
         aposta = minhas.get(jogo.id)
         d["minha_aposta"] = aposta.to_dict() if aposta else None
         saida.append(d)
-    
+
     db.session.commit()
     return jsonify(saida)
 
@@ -288,15 +304,15 @@ def salvar_aposta():
 @jwt_required()
 def ranking():
     """Mais acertos: pontos totais, placares exatos e apostas pontuadas."""
-    
+
     # ✅ NOVO: Buscar IDs dos jogos concluídos UMA VEZ (performance)
     jogos_concluidos_ids = set(
-        j.id for j in Jogo.query.filter(
-            Jogo.gols_time1.isnot(None),
-            Jogo.gols_time2.isnot(None)
+        j.id
+        for j in Jogo.query.filter(
+            Jogo.gols_time1.isnot(None), Jogo.gols_time2.isnot(None)
         ).all()
     )
-    
+
     tabela = {}
     for aposta in Aposta.query.all():
         jogo = aposta.jogo
@@ -309,25 +325,25 @@ def ranking():
                 "acertos": 0,
                 "apostas": 0,
                 "apostas_pontuadas": 0,
-                "apostas_em_jogos_concluidos": 0,      # ✅ NOVO
+                "apostas_em_jogos_concluidos": 0,  # ✅ NOVO
                 "apostas_pontuadas_em_jogos_concluidos": 0,  # ✅ NOVO
             },
         )
         item["apostas"] += 1
-        
+
         # ✅ NOVO: Se jogo foi concluído, contar também
         if aposta.jogo_id in jogos_concluidos_ids:
             item["apostas_em_jogos_concluidos"] += 1
-        
+
         if aposta.pontos is not None and aposta.pontos > 0:
             item["pontos"] += aposta.pontos
             item["acertos"] += 1
             item["apostas_pontuadas"] += 1
-            
+
             # ✅ NOVO: Se pontuou em jogo concluído, contar também
             if aposta.jogo_id in jogos_concluidos_ids:
                 item["apostas_pontuadas_em_jogos_concluidos"] += 1
-        
+
         # ✅ MELHORADO: Só contar exatos em jogos concluídos
         if (
             aposta.jogo_id in jogos_concluidos_ids
@@ -335,7 +351,7 @@ def ranking():
             and aposta.gols_time2 == jogo.gols_time2
         ):
             item["exatos"] += 1
-    
+
     saida = sorted(
         tabela.values(), key=lambda i: (i["pontos"], i["exatos"]), reverse=True
     )
@@ -409,7 +425,7 @@ def sync_resultados():
     """Sincroniza resultados com a API football-data.org"""
     from sync_resultados import sincronizar_resultados
 
-    sucesso = sincronizar_resultados(app=app, verbose=True, status_filter="IN_PLAY")
+    sucesso = sincronizar_resultados(app=app, verbose=True, status_filter=None)
 
     if sucesso:
         return jsonify(
