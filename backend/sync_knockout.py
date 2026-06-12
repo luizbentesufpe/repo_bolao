@@ -3,9 +3,11 @@
 Seed script para popular todos os jogos de mata-mata (knockout stage)
 da Copa do Mundo 2026 no banco de dados
 """
+
 import os
-import requests
 from datetime import datetime
+
+import requests
 
 API_KEY = os.getenv("FOOTBALL_DATA_API_KEY", "")
 BASE_URL = "https://api.football-data.org/v4"
@@ -74,7 +76,7 @@ def seed_knockout_matches(app=None, verbose=True):
         app = flask_app
 
     with app.app_context():
-        from models import Jogo, Time, Campeonato, db
+        from models import Campeonato, Jogo, Time, db
 
         if verbose:
             print("🔄 Buscando jogos de mata-mata da API...", flush=True)
@@ -89,12 +91,21 @@ def seed_knockout_matches(app=None, verbose=True):
                 return False
 
             dados = response.json()
-            
+
             # Estágios de mata-mata
-            knockout_stages = ["LAST_32", "LAST_16", "QUARTER_FINALS", "SEMI_FINALS", "THIRD_PLACE", "FINAL"]
-            
+            knockout_stages = [
+                "LAST_32",
+                "LAST_16",
+                "QUARTER_FINALS",
+                "SEMI_FINALS",
+                "THIRD_PLACE",
+                "FINAL",
+            ]
+
             # Encontrar campeonato Copa do Mundo
-            campeonato = Campeonato.query.filter_by(nome="Copa do Mundo").first()
+            campeonato = Campeonato.query.filter_by(
+                nome="Copa do Mundo FIFA 2026"
+            ).first()
             if not campeonato:
                 print("❌ Campeonato 'Copa do Mundo' não encontrado!", flush=True)
                 return False
@@ -112,7 +123,10 @@ def seed_knockout_matches(app=None, verbose=True):
                 # Pular se times não estão definidos ainda
                 if not match["homeTeam"]["name"] or not match["awayTeam"]["name"]:
                     if verbose:
-                        print(f"⏭️  Pulando: Times ainda não definidos (Stage: {match.get('stage')})", flush=True)
+                        print(
+                            f"⏭️  Pulando: Times ainda não definidos (Stage: {match.get('stage')})",
+                            flush=True,
+                        )
                     continue
 
                 # Traduzir nomes dos times
@@ -124,37 +138,51 @@ def seed_knockout_matches(app=None, verbose=True):
                 time2_obj = Time.query.filter_by(nome=time2_nome).first()
 
                 if not time1_obj or not time2_obj:
-                    nao_encontrados.append(f"{time1_nome} vs {time2_nome} ({match.get('stage')})")
+                    nao_encontrados.append(
+                        f"{time1_nome} vs {time2_nome} ({match.get('stage')})"
+                    )
                     if verbose:
-                        print(f"⚠️  Times não encontrados: {time1_nome} vs {time2_nome}", flush=True)
+                        print(
+                            f"⚠️  Times não encontrados: {time1_nome} vs {time2_nome}",
+                            flush=True,
+                        )
                     continue
 
                 # Verificar se jogo já existe
                 jogo_existente = Jogo.query.filter_by(
                     time1_id=time1_obj.id,
                     time2_id=time2_obj.id,
-                    campeonato_id=campeonato.id
+                    campeonato_id=campeonato.id,
                 ).first()
 
                 try:
                     # Data do jogo
-                    data_hora = datetime.fromisoformat(match["utcDate"].replace("Z", "+00:00"))
+                    data_hora = datetime.fromisoformat(
+                        match["utcDate"].replace("Z", "+00:00")
+                    )
 
                     if jogo_existente:
                         # Atualizar jogo existente
                         jogo_existente.status_api = match.get("status", "TIMED")
                         jogo_existente.data_hora = data_hora
-                        
+
                         # Atualizar gols se disponível
                         if match.get("score"):
                             score = match["score"]
                             if score.get("fullTime"):
-                                jogo_existente.gols_time1 = score["fullTime"].get("home")
-                                jogo_existente.gols_time2 = score["fullTime"].get("away")
-                        
+                                jogo_existente.gols_time1 = score["fullTime"].get(
+                                    "home"
+                                )
+                                jogo_existente.gols_time2 = score["fullTime"].get(
+                                    "away"
+                                )
+
                         atualizados += 1
                         if verbose:
-                            print(f"✏️  ATUALIZADO: {time1_nome} vs {time2_nome} ({match.get('stage')})", flush=True)
+                            print(
+                                f"✏️  ATUALIZADO: {time1_nome} vs {time2_nome} ({match.get('stage')})",
+                                flush=True,
+                            )
                     else:
                         # Criar novo jogo
                         novo_jogo = Jogo(
@@ -176,7 +204,7 @@ def seed_knockout_matches(app=None, verbose=True):
 
                         db.session.add(novo_jogo)
                         criados += 1
-                        
+
                         if verbose:
                             stage_map = {
                                 "LAST_32": "32 avos (16 avos)",
@@ -184,31 +212,43 @@ def seed_knockout_matches(app=None, verbose=True):
                                 "QUARTER_FINALS": "Quartas",
                                 "SEMI_FINALS": "Semifinais",
                                 "THIRD_PLACE": "3º lugar",
-                                "FINAL": "Final"
+                                "FINAL": "Final",
                             }
-                            stage_nome = stage_map.get(match.get("stage"), match.get("stage"))
-                            print(f"✅ CRIADO: {time1_nome} vs {time2_nome} [{stage_nome}]", flush=True)
+                            stage_nome = stage_map.get(
+                                match.get("stage"), match.get("stage")
+                            )
+                            print(
+                                f"✅ CRIADO: {time1_nome} vs {time2_nome} [{stage_nome}]",
+                                flush=True,
+                            )
 
                 except Exception as e:
                     erros += 1
-                    print(f"❌ Erro ao processar {time1_nome} vs {time2_nome}: {e}", flush=True)
+                    print(
+                        f"❌ Erro ao processar {time1_nome} vs {time2_nome}: {e}",
+                        flush=True,
+                    )
                     continue
 
             db.session.commit()
 
             print("\n" + "=" * 70, flush=True)
-            print(f"🎉 RESUMO:", flush=True)
+            print("🎉 RESUMO:", flush=True)
             print(f"   ✅ Criados: {criados}", flush=True)
             print(f"   ✏️  Atualizados: {atualizados}", flush=True)
             print(f"   ❌ Erros: {erros}", flush=True)
-            
+
             if nao_encontrados:
-                print(f"\n⚠️  Times não encontrados ({len(nao_encontrados)}):", flush=True)
-                for nao_encontrado in nao_encontrados[:5]:  # Mostrar apenas os 5 primeiros
+                print(
+                    f"\n⚠️  Times não encontrados ({len(nao_encontrados)}):", flush=True
+                )
+                for nao_encontrado in nao_encontrados[
+                    :5
+                ]:  # Mostrar apenas os 5 primeiros
                     print(f"   - {nao_encontrado}", flush=True)
                 if len(nao_encontrados) > 5:
                     print(f"   ... e mais {len(nao_encontrados) - 5}", flush=True)
-            
+
             print("=" * 70, flush=True)
 
             return True
@@ -216,10 +256,12 @@ def seed_knockout_matches(app=None, verbose=True):
         except Exception as e:
             print(f"❌ Erro na sincronização: {e}", flush=True)
             import traceback
+
             traceback.print_exc()
             return False
 
 
 if __name__ == "__main__":
     from app import app as flask_app
+
     seed_knockout_matches(app=flask_app, verbose=True)

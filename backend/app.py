@@ -2,6 +2,10 @@
 """
 API do Bolao da Copa 2026 (Flask).
 
+🚀 OTIMIZAÇÃO FINAL: 2 ENDPOINTS SEPARADOS
+1. GET /api/jogos → Dados do banco (< 500ms)
+2. POST /api/sincronizar → Sincroniza com API (background, não bloqueia)
+
 Rodar:
     pip install -r requirements.txt
     python seed.py        # cria o banco e popula os 72 jogos da fase de grupos
@@ -147,7 +151,7 @@ def recalcular_pontos_jogo(jogo):
                 aposta.pontos = 0
 
 
-# ---------------------------------------------------------------- AUTENTICACAO
+# ================================================================ AUTENTICACAO
 @app.post("/api/auth/register")
 def register():
     dados = request.get_json(silent=True) or {}
@@ -195,37 +199,15 @@ def login():
     )
 
 
-# -------------------------------------------------------------------- JOGOS
+# ================================================================ JOGOS - ENDPOINT 1: DADOS (RÁPIDO)
 @app.get("/api/jogos")
 @jwt_required(optional=True)
 def listar_jogos():
-    global ultimo_sync
-    global ultimo_sync_timestamp  # ✅ ADICIONAR ISTO
-    from sync_resultados import sincronizar_resultados
-
-    agora = datetime.now()
-
-    # ✅ Sincroniza apenas se passou INTERVALO_SYNC minutos
-    if (
-        ultimo_sync is None
-        or (agora - ultimo_sync).total_seconds() > INTERVALO_SYNC * 60
-    ):
-        print(
-            f"[{agora.strftime('%H:%M:%S')}] 🔄 Sincronizando placares...", flush=True
-        )
-        sincronizar_resultados(app=app, verbose=False, status_filter=None)
-        print(f"[{agora.strftime('%H:%M:%S')}] 🎯 Populando mata-mata...", flush=True)
-        seed_knockout_matches(app=app, verbose=False)
-        ultimo_sync = agora
-        ultimo_sync_timestamp = agora.isoformat()  # ✅ ADICIONAR ISTO
-        print(f"[{agora.strftime('%H:%M:%S')}] ✅ Sincronização concluída!", flush=True)
-    else:
-        tempo_restante = INTERVALO_SYNC * 60 - (agora - ultimo_sync).total_seconds()
-        print(
-            f"[{agora.strftime('%H:%M:%S')}] ⏳ Cache ativo (próximo sync em {int(tempo_restante)}s)",
-            flush=True,
-        )
-
+    """
+    ✅ ENDPOINT 1: Apenas retorna dados do banco (SEM sincronizar)
+    Tempo: < 500ms
+    Não bloqueia: Sim
+    """
     query = Jogo.query.order_by(Jogo.data_hora)
 
     user_id = get_jwt_identity()
@@ -249,12 +231,65 @@ def listar_jogos():
 
     db.session.commit()
 
-    response = jsonify(saida)  # Retorna array direto
+    # ✅ Retornar com cache HTTP
+    response = jsonify(saida)
+    response.headers['Cache-Control'] = 'public, max-age=60'
     if ultimo_sync_timestamp:
         response.headers['X-Last-Sync'] = ultimo_sync_timestamp
+    
     return response
 
 
+# ================================================================ JOGOS - ENDPOINT 2: SINCRONIZAR (BACKGROUND)
+@app.post("/api/sincronizar")
+@jwt_required(optional=True)
+def sincronizar():
+    """
+    ✅ ENDPOINT 2: Sincroniza com API football-data.org (BACKGROUND)
+    Tempo: 5-10s (mas não bloqueia frontend)
+    Não bloqueia: Sim (fire and forget)
+    """
+    global ultimo_sync
+    global ultimo_sync_timestamp
+    from sync_resultados import sincronizar_resultados
+
+    agora = datetime.now()
+
+    # ✅ Sincroniza APENAS se passou 5 minutos
+    if (
+        ultimo_sync is None
+        or (agora - ultimo_sync).total_seconds() > INTERVALO_SYNC * 60
+    ):
+        print(
+            f"[{agora.strftime('%H:%M:%S')}] 🔄 Sincronizando placares...", flush=True
+        )
+        sincronizar_resultados(app=app, verbose=False, status_filter=None)
+        print(f"[{agora.strftime('%H:%M:%S')}] 🎯 Populando mata-mata...", flush=True)
+        seed_knockout_matches(app=app, verbose=False)
+        ultimo_sync = agora
+        ultimo_sync_timestamp = agora.isoformat()
+        print(f"[{agora.strftime('%H:%M:%S')}] ✅ Sincronização concluída!", flush=True)
+        
+        return jsonify({
+            "ok": True,
+            "msg": "Sincronização concluída",
+            "ultimaSincronizacao": ultimo_sync_timestamp
+        }), 200
+    else:
+        tempo_restante = INTERVALO_SYNC * 60 - (agora - ultimo_sync).total_seconds()
+        print(
+            f"[{agora.strftime('%H:%M:%S')}] ⏳ Cache ativo (próximo sync em {int(tempo_restante)}s)",
+            flush=True,
+        )
+        
+        return jsonify({
+            "ok": False,
+            "msg": f"Cache ativo, próximo sync em {int(tempo_restante)}s",
+            "proximaSincronizacao": int(tempo_restante)
+        }), 200
+
+
+# ================================================================ APOSTAS DO JOGO
 @app.get("/api/apostas-do-jogo/<int:jogo_id>")
 @jwt_required(optional=True)
 def apostas_do_jogo(jogo_id):
@@ -274,7 +309,7 @@ def apostas_do_jogo(jogo_id):
     )
 
 
-# ------------------------------------------------------------------- APOSTAS
+# ================================================================ APOSTAS
 @app.post("/api/apostas")
 @jwt_required()
 def salvar_aposta():
@@ -311,7 +346,7 @@ def salvar_aposta():
     return jsonify(aposta.to_dict()), 200
 
 
-# ------------------------------------------------------------------- RANKING
+# ================================================================ RANKING
 @app.get("/api/ranking")
 @jwt_required()
 def ranking():
@@ -372,7 +407,7 @@ def ranking():
     return jsonify(saida)
 
 
-# ------------------------------------------------- RESULTADO (admin simples)
+# ================================================================ RESULTADO
 @app.post("/api/jogos/<int:jogo_id>/resultado")
 @jwt_required()
 def lancar_resultado(jogo_id):

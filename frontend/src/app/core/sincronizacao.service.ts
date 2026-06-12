@@ -2,45 +2,78 @@ import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { environment } from '../../environment/environment.prod';
 
-@Injectable({ providedIn: 'root' })
+/**
+ * 🚀 SERVIÇO DE SINCRONIZAÇÃO OTIMIZADO
+ * 
+ * 1 método único que faz tudo:
+ * sincronizar() → Pega dados + sincroniza placares (background)
+ */
+@Injectable({
+  providedIn: 'root'
+})
 export class SincronizacaoService {
   
   private ultimaSincronizacao: number = 0;
-  private INTERVALO_CACHE = 5 * 60 * 1000;
+  private INTERVALO_CACHE = 5 * 60 * 1000;  // 5 minutos em ms
 
   constructor(private http: HttpClient) {}
 
-  sincronizar(): void {
+  /**
+   * ✅ FUNÇÃO ÚNICA - Faz tudo!
+   * 1. Pega dados do banco (< 500ms)
+   * 2. Sincroniza placares em background (não bloqueia)
+   */
+  sincronizar(onDados?: (jogos: any[]) => void) {
+    // ✅ 1. PEGA DADOS (RÁPIDO)
+    const urlJogos = `${environment.apiUrl}/api/jogos`;
+    this.http.get<any>(urlJogos).subscribe(
+      (response) => {
+        console.log(`✅ ${response.length} jogos carregados em < 500ms`);
+        // Executa callback com os dados
+        if (onDados) {
+          onDados(response);
+        }
+      },
+      (erro) => {
+        console.error('⚠️ Erro ao carregar jogos:', erro);
+      }
+    );
+
+    // ✅ 2. SINCRONIZA PLACARES (BACKGROUND - não bloqueia)
+    this.sincronizarPlacares();
+  }
+
+  /**
+   * ✅ SINCRONIZA PLACARES (BACKGROUND)
+   * Respeta cache de 5 minutos
+   */
+  private sincronizarPlacares(): void {
     const agora = Date.now();
     const tempoDesdeUltimo = agora - this.ultimaSincronizacao;
 
-    // Verifica cache
+    // ✅ Verifica cache ANTES de fazer requisição
     if (this.ultimaSincronizacao > 0 && tempoDesdeUltimo < this.INTERVALO_CACHE) {
       const tempoRestante = Math.ceil((this.INTERVALO_CACHE - tempoDesdeUltimo) / 1000);
       console.log(`⏳ Cache ativo (próxima sync em ${tempoRestante}s)`);
-      return;
+      return;  // PULA a requisição
     }
 
-    console.log('🔄 Sincronizando com backend...');
+    console.log('🔄 Sincronizando placares (background)...');
     
-    const url = `${environment.apiUrl}/api/jogos`;
+    const urlSync = `${environment.apiUrl}/api/sincronizar`;
     
-    // ✅ Ler resposta COM headers
-    this.http.get<any>(url, { observe: 'response' }).subscribe(
-      (fullResponse) => {
-        // ✅ Ler timestamp do header
-        const lastSync = fullResponse.headers.get('X-Last-Sync');
-        
-        if (lastSync) {
-          this.ultimaSincronizacao = new Date(lastSync).getTime();
-        } else {
+    // ✅ Fire and forget - não espera resposta, não bloqueia
+    this.http.post<any>(urlSync, {}).subscribe(
+      (response) => {
+        if (response.ok) {
           this.ultimaSincronizacao = agora;
+          console.log(`✅ Placares sincronizados!`);
+        } else {
+          console.log(`⏳ ${response.msg}`);
         }
-        
-        console.log(`✅ Sincronização concluída! ${fullResponse.body.length} jogos`);
       },
       (erro) => {
-        console.error('⚠️ Erro ao sincronizar:', erro);
+        console.error('⚠️ Erro ao sincronizar placares:', erro);
       }
     );
   }
