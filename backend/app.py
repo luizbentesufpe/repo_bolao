@@ -249,11 +249,10 @@ def listar_jogos():
 
     db.session.commit()
 
-    # ✅ RETORNAR response com timestamp (IMPORTANTE!)
-    return jsonify({
-        "jogos": saida,
-        "ultimaSincronizacao": ultimo_sync_timestamp
-    })
+    response = jsonify(saida)  # Retorna array direto
+    if ultimo_sync_timestamp:
+        response.headers['X-Last-Sync'] = ultimo_sync_timestamp
+    return response
 
 
 @app.get("/api/apostas-do-jogo/<int:jogo_id>")

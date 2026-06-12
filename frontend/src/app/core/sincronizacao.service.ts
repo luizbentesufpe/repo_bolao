@@ -1,14 +1,12 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { environment } from '../../environment/environment.prod';  // ✅ CORRIGIDO
+import { environment } from '../../environment/environment.prod';
 
-@Injectable({
-  providedIn: 'root'
-})
+@Injectable({ providedIn: 'root' })
 export class SincronizacaoService {
   
-  private ultimaSincronizacao: number = 0;  // ✅ NOVO: Cache em memória
-  private INTERVALO_CACHE = 5 * 60 * 1000;  // ✅ NOVO: 5 minutos
+  private ultimaSincronizacao: number = 0;
+  private INTERVALO_CACHE = 5 * 60 * 1000;
 
   constructor(private http: HttpClient) {}
 
@@ -16,30 +14,30 @@ export class SincronizacaoService {
     const agora = Date.now();
     const tempoDesdeUltimo = agora - this.ultimaSincronizacao;
 
-    // ✅ NOVO: Verifica cache ANTES de fazer requisição
+    // Verifica cache
     if (this.ultimaSincronizacao > 0 && tempoDesdeUltimo < this.INTERVALO_CACHE) {
       const tempoRestante = Math.ceil((this.INTERVALO_CACHE - tempoDesdeUltimo) / 1000);
       console.log(`⏳ Cache ativo (próxima sync em ${tempoRestante}s)`);
-      return;  // PULA a requisição
+      return;
     }
 
     console.log('🔄 Sincronizando com backend...');
     
-    // ✅ CORRIGIDO: Usa environment.apiUrl direto (sem adicionar /api extra)
     const url = `${environment.apiUrl}/api/jogos`;
     
-    this.http.get<any>(url).subscribe(
-      (response) => {  // ✅ NOVO: Recebe objeto com jogos e ultimaSincronizacao
-        // ✅ NOVO: Sincronizar cache com timestamp do backend
-        const ultimaSincBackend = response.ultimaSincronizacao;
+    // ✅ Ler resposta COM headers
+    this.http.get<any>(url, { observe: 'response' }).subscribe(
+      (fullResponse) => {
+        // ✅ Ler timestamp do header
+        const lastSync = fullResponse.headers.get('X-Last-Sync');
         
-        if (ultimaSincBackend) {
-          this.ultimaSincronizacao = new Date(ultimaSincBackend).getTime();
-          console.log(`✅ Sincronização concluída! ${response.jogos.length} jogos`);
+        if (lastSync) {
+          this.ultimaSincronizacao = new Date(lastSync).getTime();
         } else {
           this.ultimaSincronizacao = agora;
-          console.log(`✅ Dados em cache! ${response.jogos.length} jogos`);
         }
+        
+        console.log(`✅ Sincronização concluída! ${fullResponse.body.length} jogos`);
       },
       (erro) => {
         console.error('⚠️ Erro ao sincronizar:', erro);
