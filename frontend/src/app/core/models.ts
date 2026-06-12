@@ -33,4 +33,6 @@ export interface RankingItem {
   posicao: number; nome: string; pontos: number;
   exatos: number; acertos: number; apostas: number;
   apostas_pontuadas: number;
+  apostas_em_jogos_concluidos?: number;
+  apostas_pontuadas_em_jogos_concluidos?: number;
 }

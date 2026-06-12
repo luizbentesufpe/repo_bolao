@@ -251,11 +251,18 @@ def salvar_aposta():
 @jwt_required()
 def ranking():
     """Mais acertos: pontos totais, placares exatos e apostas pontuadas."""
+    
+    # ✅ NOVO: Buscar IDs dos jogos concluídos UMA VEZ (performance)
+    jogos_concluidos_ids = set(
+        j.id for j in Jogo.query.filter(
+            Jogo.gols_time1.isnot(None),
+            Jogo.gols_time2.isnot(None)
+        ).all()
+    )
+    
     tabela = {}
-
     for aposta in Aposta.query.all():
         jogo = aposta.jogo
-
         item = tabela.setdefault(
             aposta.user_id,
             {
@@ -265,30 +272,38 @@ def ranking():
                 "acertos": 0,
                 "apostas": 0,
                 "apostas_pontuadas": 0,
+                "apostas_em_jogos_concluidos": 0,      # ✅ NOVO
+                "apostas_pontuadas_em_jogos_concluidos": 0,  # ✅ NOVO
             },
         )
-
         item["apostas"] += 1
-
-        # ✅ USA COLUNA PONTOS (não calcula dinamicamente)
+        
+        # ✅ NOVO: Se jogo foi concluído, contar também
+        if aposta.jogo_id in jogos_concluidos_ids:
+            item["apostas_em_jogos_concluidos"] += 1
+        
         if aposta.pontos is not None and aposta.pontos > 0:
             item["pontos"] += aposta.pontos
             item["acertos"] += 1
             item["apostas_pontuadas"] += 1
-
-        # Conta exatos
+            
+            # ✅ NOVO: Se pontuou em jogo concluído, contar também
+            if aposta.jogo_id in jogos_concluidos_ids:
+                item["apostas_pontuadas_em_jogos_concluidos"] += 1
+        
+        # ✅ MELHORADO: Só contar exatos em jogos concluídos
         if (
-            aposta.gols_time1 == jogo.gols_time1
+            aposta.jogo_id in jogos_concluidos_ids
+            and aposta.gols_time1 == jogo.gols_time1
             and aposta.gols_time2 == jogo.gols_time2
         ):
             item["exatos"] += 1
-
+    
     saida = sorted(
         tabela.values(), key=lambda i: (i["pontos"], i["exatos"]), reverse=True
     )
     for pos, item in enumerate(saida, start=1):
         item["posicao"] = pos
-
     return jsonify(saida)
 
 
