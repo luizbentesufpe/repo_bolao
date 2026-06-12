@@ -35,6 +35,9 @@ app.config["JWT_SECRET_KEY"] = os.getenv(
 )
 app.config["JWT_ACCESS_TOKEN_EXPIRES"] = timedelta(days=7)
 
+ultimo_sync_timestamp = None
+
+
 db.init_app(app)
 jwt = JWTManager(app)
 CORS(
@@ -197,11 +200,12 @@ def login():
 @jwt_required(optional=True)
 def listar_jogos():
     global ultimo_sync
+    global ultimo_sync_timestamp  # ✅ ADICIONAR ISTO
     from sync_resultados import sincronizar_resultados
 
     agora = datetime.now()
 
-    # ✅ Sincroniza apenas se passou INTERVALO_SYNC minutos desde o último sync
+    # ✅ Sincroniza apenas se passou INTERVALO_SYNC minutos
     if (
         ultimo_sync is None
         or (agora - ultimo_sync).total_seconds() > INTERVALO_SYNC * 60
@@ -213,6 +217,7 @@ def listar_jogos():
         print(f"[{agora.strftime('%H:%M:%S')}] 🎯 Populando mata-mata...", flush=True)
         seed_knockout_matches(app=app, verbose=False)
         ultimo_sync = agora
+        ultimo_sync_timestamp = agora.isoformat()  # ✅ ADICIONAR ISTO
         print(f"[{agora.strftime('%H:%M:%S')}] ✅ Sincronização concluída!", flush=True)
     else:
         tempo_restante = INTERVALO_SYNC * 60 - (agora - ultimo_sync).total_seconds()
@@ -243,7 +248,12 @@ def listar_jogos():
         saida.append(d)
 
     db.session.commit()
-    return jsonify(saida)
+
+    # ✅ RETORNAR response com timestamp (IMPORTANTE!)
+    return jsonify({
+        "jogos": saida,
+        "ultimaSincronizacao": ultimo_sync_timestamp
+    })
 
 
 @app.get("/api/apostas-do-jogo/<int:jogo_id>")
