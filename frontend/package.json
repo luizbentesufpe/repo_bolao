@@ -4,7 +4,7 @@
   "scripts": {
     "start": "ng serve",
     "build": "ng build && npm run copy-404",
-    "copy-404": "cp dist/bolao/browser/index.html dist/bolao/browser/404.html"
+    "copy-404": "cp frontend/dist/bolao/browser/index.html frontend/dist/bolao/browser/404.html"
   },
   "private": true,
 "dependencies": {
