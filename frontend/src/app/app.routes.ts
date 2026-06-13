@@ -10,23 +10,27 @@ import { RankingJogoComponent } from './pages/ranking-jogo.component';
 import { PerfilComponent } from './pages/perfil.component';
 import { AdminPlacaresComponent } from './pages/admin_placar.component';
 
-
 export const routes: Routes = [
-  { 
-    path: '', 
-    canActivate: [authGuard],
+  // ✅ Rota vazia - SEM guard, só redireciona
+  {
+    path: '',
     redirectTo: 'jogos',
     pathMatch: 'full'
   },
+
+  // Login - sem guard
   { path: 'entrar', component: AuthComponent },
   { path: 'resetar-senha', component: ResetSenhaComponent },
+
+  // Rotas protegidas - COM guard
   { path: 'jogos', component: JogosComponent, canActivate: [authGuard] },
   { path: 'bolao', component: BolaoComponent, canActivate: [authGuard] },
   { path: 'resultados', component: ResultadosComponent, canActivate: [authGuard] },
   { path: 'ranking', component: RankingComponent, canActivate: [authGuard] },
   { path: 'ranking-jogo', component: RankingJogoComponent, canActivate: [authGuard] },
-  {path: 'perfil',  component: PerfilComponent,  canActivate: [authGuard]},
+  { path: 'perfil', component: PerfilComponent, canActivate: [authGuard] },
   { path: 'admin-placares', component: AdminPlacaresComponent, canActivate: [authGuard] },
-  { path: '', pathMatch: 'full', redirectTo: 'jogos' },
+
+  // 404 - redireciona para /jogos
   { path: '**', redirectTo: 'jogos' },
 ];

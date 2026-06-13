@@ -165,7 +165,8 @@ export class RankingComponent implements OnInit {
     const falhas = this.jogoConcluido - item.apostas_pontuadas;
     const maxPontos = Math.max(...this.itens.map(i => i.pontos));
     const diferencaPontos = maxPontos - item.pontos;
-    return (falhas * 10) + diferencaPontos;
+    
+    return falhas + diferencaPontos;
   }
   // ✅ NOVO: Abre modal com jogos em que pontuou
   abrirJogos(item: RankingItem) {

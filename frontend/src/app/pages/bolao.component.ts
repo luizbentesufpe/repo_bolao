@@ -97,45 +97,27 @@ interface JogoComPalpite extends Jogo {
 
   </div>
 
-  <!-- ✅ CARD DO PÉ FRIO -->
 
-  <div style="background: linear-gradient(135deg, rgba(255,107,107,0.1) 0%, rgba(100,100,100,0.1) 100%); border: 2px solid #ff6b6b; border-radius: 12px; padding: 20px; margin-bottom: 24px;">
-
-    <h3 style="font-family: var(--fonte-display); font-size: 14px; text-transform: uppercase; color: var(--tinta); margin-bottom: 12px; letter-spacing: 1px;">
-
-      🥶 O que é Pé Frio?
-
-    </h3>
-
-    <p style="font-size: 13px; color: var(--tinta-fraca); margin: 0 0 12px 0; line-height: 1.6;">
-
-      Pé frio mede quem acertou menos! Quanto <strong>MAIOR</strong> o número, pior foi o desempenho.
-
-    </p>
-
-    <div style="background: white; padding: 12px; border-radius: 8px; border-left: 4px solid #ff6b6b;">
-
-      <div style="font-size: 12px; color: #666; font-family: 'Courier New', monospace; line-height: 1.8;">
-
-        <strong>Cálculo:</strong><br>
-
-        Pé Frio = (Jogos − Acertos) × 10 + Diferença de Pontos<br><br>
-
-        <strong>Exemplo:</strong><br>
-
-        • Você: 3 jogos, 3 acertos, 8 pontos<br>
-
-        &nbsp;&nbsp;&nbsp;→ (3−3)×10 + (8−8) = <strong style="color: var(--campo);">0 pé frio</strong> (Melhor!)<br><br>
-
-        • Amigo: 3 jogos, 1 acerto, 1 ponto<br>
-
-        &nbsp;&nbsp;&nbsp;→ (3−1)×10 + (8−1) = <strong style="color: #ff6b6b;">27 pé frio</strong> (Maior! 🥶)
-
-      </div>
-
+<!-- ✅ CARD DO PÉ FRIO (SIMPLIFICADO) -->
+<div style="background: linear-gradient(135deg, rgba(255,107,107,0.1) 0%, rgba(100,100,100,0.1) 100%); border: 2px solid #ff6b6b; border-radius: 12px; padding: 20px; margin-bottom: 24px;">
+  <h3 style="font-family: var(--fonte-display); font-size: 14px; text-transform: uppercase; color: var(--tinta); margin-bottom: 12px; letter-spacing: 1px;">
+    🥶 O que é Pé Frio?
+  </h3>
+  <p style="font-size: 13px; color: var(--tinta-fraca); margin: 0 0 12px 0; line-height: 1.6;">
+    Pé frio mede quem acertou menos! Quanto <strong>MAIOR</strong> o número, pior foi o desempenho.
+  </p>
+  <div style="background: white; padding: 12px; border-radius: 8px; border-left: 4px solid #ff6b6b;">
+    <div style="font-size: 12px; color: #666; font-family: 'Courier New', monospace; line-height: 1.8;">
+      <strong>Cálculo:</strong><br>
+      Pé Frio = (Jogos − Acertos) + (Máx Pontos − Seus Pontos)<br><br>
+      <strong>Exemplo:</strong><br>
+      • Você: 3 jogos, 3 acertos, 8 pontos<br>
+      &nbsp;&nbsp;&nbsp;→ (3−3) + (8−8) = <strong style="color: var(--campo);">0 pé frio</strong> (Melhor!)<br><br>
+      • Amigo: 3 jogos, 1 acerto, 1 ponto<br>
+      &nbsp;&nbsp;&nbsp;→ (3−1) + (8−1) = <strong style="color: #ff6b6b;">9 pé frio</strong> (Maior! 🥶)
     </div>
-
   </div>
+</div>
 
       @if (carregando) {
         <p class="vazio">Carregando jogos…</p>
