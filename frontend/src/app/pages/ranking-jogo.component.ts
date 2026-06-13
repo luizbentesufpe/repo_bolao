@@ -262,6 +262,7 @@ export class RankingJogoComponent implements OnInit, OnDestroy {
   atualizarLista() {
     let jogos = this.jogos;
     
+    // ✅ PASSO 1: Filtro de STATUS
     switch (this.filtro) {
       case 'encerrado':
         jogos = jogos.filter(j => j.encerrado);
@@ -276,26 +277,29 @@ export class RankingJogoComponent implements OnInit, OnDestroy {
         jogos = jogos;
     }
 
-    const agora = new Date();
-    const hoje = new Date(agora.getFullYear(), agora.getMonth(), agora.getDate());
-    const proximaSemana = new Date(hoje.getTime() + 7 * 24 * 60 * 60 * 1000);
+    // ✅ PASSO 2: Filtro de DATA (apenas se NÃO for "encerrado")
+    if (this.filtro !== 'encerrado') {
+      const agora = new Date();
+      const hoje = new Date(agora.getFullYear(), agora.getMonth(), agora.getDate());
+      const proximaSemana = new Date(hoje.getTime() + 7 * 24 * 60 * 60 * 1000);
 
-    switch (this.periodo) {
-      case 'hoje':
-        jogos = jogos.filter(j => {
-          const dataJogo = new Date(j.data_hora);
-          const diaJogo = new Date(dataJogo.getFullYear(), dataJogo.getMonth(), dataJogo.getDate());
-          return diaJogo.getTime() === hoje.getTime();
-        });
-        break;
-      case 'semana':
-        jogos = jogos.filter(j => {
-          const dataJogo = new Date(j.data_hora);
-          return dataJogo >= hoje && dataJogo <= proximaSemana;
-        });
-        break;
-      default:
-        jogos = jogos;
+      switch (this.periodo) {
+        case 'hoje':
+          jogos = jogos.filter(j => {
+            const dataJogo = new Date(j.data_hora);
+            const diaJogo = new Date(dataJogo.getFullYear(), dataJogo.getMonth(), dataJogo.getDate());
+            return diaJogo.getTime() === hoje.getTime();
+          });
+          break;
+        case 'semana':
+          jogos = jogos.filter(j => {
+            const dataJogo = new Date(j.data_hora);
+            return dataJogo >= hoje && dataJogo <= proximaSemana;
+          });
+          break;
+        default:
+          jogos = jogos;
+      }
     }
 
     this.jogosFiltrados = jogos;

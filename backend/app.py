@@ -3,8 +3,12 @@
 API do Bolao da Copa 2026 (Flask).
 
 🚀 OTIMIZAÇÃO FINAL: 2 ENDPOINTS SEPARADOS
-1. GET /api/jogos → Dados do banco (< 500ms)
-2. POST /api/sincronizar → Sincroniza com API (background, não bloqueia)
+1. GET /api/jogos → Dados do banco (< 500ms, SEM cache)
+2. POST /api/sincronizar → Sincroniza com API (background, COM cache 5 min)
+
+✅ CACHE CORRETO:
+- Dados do BANCO: Sem cache (sempre fresco)
+- Chamadas EXTERNAS (API football-data): Com cache 5 min
 
 Rodar:
     pip install -r requirements.txt
@@ -62,6 +66,15 @@ INTERVALO_SYNC = 5  # minutos
 
 def erro(msg, status=400):
     return jsonify({"erro": msg}), status
+
+
+def resposta_sem_cache(data):
+    """Retorna resposta JSON SEM cache (para dados do banco)"""
+    response = jsonify(data)
+    response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '0'
+    return response
 
 
 # ✅ FUNÇÃO PARA CALCULAR PONTOS
@@ -160,11 +173,11 @@ def register():
     senha = dados.get("senha") or ""
 
     if not nome or not email or not senha:
-        return erro("Informe nome, email e senha.")
+        return resposta_sem_cache({"erro": "Informe nome, email e senha."}), 400
     if len(senha) < 4:
-        return erro("A senha precisa de pelo menos 4 caracteres.")
+        return resposta_sem_cache({"erro": "A senha precisa de pelo menos 4 caracteres."}), 400
     if User.query.filter_by(email=email).first():
-        return erro("Esse email ja esta cadastrado.")
+        return resposta_sem_cache({"erro": "Esse email ja esta cadastrado."}), 400
 
     user = User(nome=nome, email=email)
     user.set_senha(senha)
@@ -172,12 +185,10 @@ def register():
     db.session.commit()
 
     token = create_access_token(identity=str(user.id))
-    return jsonify(
-        {
-            "token": token,
-            "user": {"id": user.id, "nome": user.nome, "email": user.email},
-        }
-    ), 201
+    return resposta_sem_cache({
+        "token": token,
+        "user": {"id": user.id, "nome": user.nome, "email": user.email},
+    }), 201
 
 
 @app.post("/api/auth/login")
@@ -188,15 +199,13 @@ def login():
 
     user = User.query.filter_by(email=email).first()
     if not user or not user.checa_senha(senha):
-        return erro("Email ou senha invalidos.", 401)
+        return resposta_sem_cache({"erro": "Email ou senha invalidos."}), 401
 
     token = create_access_token(identity=str(user.id))
-    return jsonify(
-        {
-            "token": token,
-            "user": {"id": user.id, "nome": user.nome, "email": user.email},
-        }
-    )
+    return resposta_sem_cache({
+        "token": token,
+        "user": {"id": user.id, "nome": user.nome, "email": user.email},
+    })
 
 
 # ================================================================ JOGOS - ENDPOINT 1: DADOS (RÁPIDO)
@@ -206,7 +215,7 @@ def listar_jogos():
     """
     ✅ ENDPOINT 1: Apenas retorna dados do banco (SEM sincronizar)
     Tempo: < 500ms
-    Não bloqueia: Sim
+    Cache: ❌ SEM cache (dados sempre frescos)
     """
     query = Jogo.query.order_by(Jogo.data_hora)
 
@@ -231,13 +240,8 @@ def listar_jogos():
 
     db.session.commit()
 
-    # ✅ Retornar com cache HTTP
-    response = jsonify(saida)
-    response.headers['Cache-Control'] = 'public, max-age=60'
-    if ultimo_sync_timestamp:
-        response.headers['X-Last-Sync'] = ultimo_sync_timestamp
-    
-    return response
+    # ✅ Retornar SEM cache
+    return resposta_sem_cache(saida)
 
 
 # ================================================================ JOGOS - ENDPOINT 2: SINCRONIZAR (BACKGROUND)
@@ -247,7 +251,7 @@ def sincronizar():
     """
     ✅ ENDPOINT 2: Sincroniza com API football-data.org (BACKGROUND)
     Tempo: 5-10s (mas não bloqueia frontend)
-    Não bloqueia: Sim (fire and forget)
+    Cache: ✅ COM cache 5 minutos (não sobrecarrega API externa)
     """
     global ultimo_sync
     global ultimo_sync_timestamp
@@ -293,35 +297,41 @@ def sincronizar():
 @app.get("/api/apostas-do-jogo/<int:jogo_id>")
 @jwt_required(optional=True)
 def apostas_do_jogo(jogo_id):
-    """Resultado do bolao por jogo: todas as apostas + pontos de cada um."""
+    """
+    Resultado do bolao por jogo: todas as apostas + pontos de cada um.
+    Cache: ❌ SEM cache (dados do banco sempre frescos)
+    """
     jogo = Jogo.query.get_or_404(jogo_id)
 
     # ✅ ORDENA POR COLUNA PONTOS (não calcula dinamicamente)
     apostas = Aposta.query.filter_by(jogo_id=jogo_id).all()
     apostas_sorted = sorted(apostas, key=lambda a: a.pontos or 0, reverse=True)
 
-    return jsonify(
-        {
-            "jogo": jogo.to_dict(),
-            "liberado": not jogo.comecou,
-            "apostas": [a.to_dict(com_user=True) for a in apostas_sorted],
-        }
-    )
+    saida = {
+        "jogo": jogo.to_dict(),
+        "liberado": not jogo.comecou,
+        "apostas": [a.to_dict(com_user=True) for a in apostas_sorted],
+    }
+    
+    return resposta_sem_cache(saida)
 
 
 # ================================================================ APOSTAS
 @app.post("/api/apostas")
 @jwt_required()
 def salvar_aposta():
-    """Cria/atualiza a aposta do usuario logado em um jogo (upsert)."""
+    """
+    Cria/atualiza a aposta do usuario logado em um jogo (upsert).
+    Cache: ❌ SEM cache (dados do banco sempre frescos)
+    """
     user_id = int(get_jwt_identity())
     dados = request.get_json(silent=True) or {}
 
     jogo = Jogo.query.get(dados.get("jogo_id"))
     if jogo is None:
-        return erro("Jogo nao encontrado.", 404)
+        return resposta_sem_cache({"erro": "Jogo nao encontrado."}), 404
     if jogo.comecou:
-        return erro("Apostas encerradas: o jogo ja comecou.", 422)
+        return resposta_sem_cache({"erro": "Apostas encerradas: o jogo ja comecou."}), 422
 
     try:
         g1 = int(dados.get("gols_time1"))
@@ -329,7 +339,7 @@ def salvar_aposta():
         if g1 < 0 or g2 < 0 or g1 > 99 or g2 > 99:
             raise ValueError
     except (TypeError, ValueError):
-        return erro("Informe um placar valido (0 a 99).")
+        return resposta_sem_cache({"erro": "Informe um placar valido (0 a 99)."}), 400
 
     aposta = Aposta.query.filter_by(jogo_id=jogo.id, user_id=user_id).first()
     if aposta is None:
@@ -343,14 +353,17 @@ def salvar_aposta():
     aposta.pontos = calcular_pontos(aposta, jogo)
 
     db.session.commit()
-    return jsonify(aposta.to_dict()), 200
+    return resposta_sem_cache(aposta.to_dict()), 200
 
 
 # ================================================================ RANKING
 @app.get("/api/ranking")
 @jwt_required()
 def ranking():
-    """Mais acertos: pontos totais, placares exatos e apostas pontuadas."""
+    """
+    Mais acertos: pontos totais, placares exatos e apostas pontuadas.
+    Cache: ❌ SEM cache (dados do banco sempre frescos)
+    """
 
     # ✅ NOVO: Buscar IDs dos jogos concluídos UMA VEZ (performance)
     jogos_concluidos_ids = set(
@@ -366,19 +379,20 @@ def ranking():
         item = tabela.setdefault(
             aposta.user_id,
             {
+                "email": aposta.user.email,  # ✅ ADICIONADO: email para comparação
                 "nome": aposta.user.nome,
                 "pontos": 0,
                 "exatos": 0,
                 "acertos": 0,
                 "apostas": 0,
                 "apostas_pontuadas": 0,
-                "apostas_em_jogos_concluidos": 0,  # ✅ NOVO
-                "apostas_pontuadas_em_jogos_concluidos": 0,  # ✅ NOVO
+                "apostas_em_jogos_concluidos": 0,
+                "apostas_pontuadas_em_jogos_concluidos": 0,
             },
         )
         item["apostas"] += 1
 
-        # ✅ NOVO: Se jogo foi concluído, contar também
+        # ✅ Se jogo foi concluído, contar também
         if aposta.jogo_id in jogos_concluidos_ids:
             item["apostas_em_jogos_concluidos"] += 1
 
@@ -387,11 +401,11 @@ def ranking():
             item["acertos"] += 1
             item["apostas_pontuadas"] += 1
 
-            # ✅ NOVO: Se pontuou em jogo concluído, contar também
+            # ✅ Se pontuou em jogo concluído, contar também
             if aposta.jogo_id in jogos_concluidos_ids:
                 item["apostas_pontuadas_em_jogos_concluidos"] += 1
 
-        # ✅ MELHORADO: Só contar exatos em jogos concluídos
+        # ✅ Só contar exatos em jogos concluídos
         if (
             aposta.jogo_id in jogos_concluidos_ids
             and aposta.gols_time1 == jogo.gols_time1
@@ -404,37 +418,45 @@ def ranking():
     )
     for pos, item in enumerate(saida, start=1):
         item["posicao"] = pos
-    return jsonify(saida)
+    
+    return resposta_sem_cache(saida)
 
 
 # ================================================================ RESULTADO
 @app.post("/api/jogos/<int:jogo_id>/resultado")
 @jwt_required()
 def lancar_resultado(jogo_id):
-    """Endpoint simples para lancar o placar final de um jogo."""
+    """
+    Endpoint simples para lancar o placar final de um jogo.
+    Cache: ❌ SEM cache (dados do banco sempre frescos)
+    """
     jogo = Jogo.query.get_or_404(jogo_id)
     dados = request.get_json(silent=True) or {}
     try:
         jogo.gols_time1 = int(dados.get("gols_time1"))
         jogo.gols_time2 = int(dados.get("gols_time2"))
     except (TypeError, ValueError):
-        return erro("Placar invalido.")
+        return resposta_sem_cache({"erro": "Placar invalido."}), 400
     db.session.commit()
-    return jsonify(jogo.to_dict())
+    return resposta_sem_cache(jogo.to_dict())
 
 
 @app.post("/api/auth/solicitar-reset")
 def solicitar_reset():
-    """Gera um token de reset e 'envia' por email (simula aqui)."""
+    """
+    Gera um token de reset e 'envia' por email (simula aqui).
+    Cache: ❌ SEM cache (dados do banco sempre frescos)
+    """
     dados = request.get_json(silent=True) or {}
     email = (dados.get("email") or "").strip().lower()
 
     user = User.query.filter_by(email=email).first()
     if not user:
         # Nao revela se email existe ou nao (seguranca)
-        return jsonify(
-            {"ok": True, "msg": "Se o email existe, recebera um link de reset."}
-        ), 200
+        return resposta_sem_cache({
+            "ok": True, 
+            "msg": "Se o email existe, recebera um link de reset."
+        }), 200
 
     # Token válido por 1 hora
     reset_token = create_access_token(
@@ -444,62 +466,77 @@ def solicitar_reset():
     # https://seu-app.com/resetar-senha?token=TOKEN
     print(f"[DEBUG] Reset token para {email}: {reset_token}")
 
-    return jsonify(
-        {"ok": True, "msg": "Link de reset enviado (verifique o terminal para teste)."}
-    ), 200
+    return resposta_sem_cache({
+        "ok": True, 
+        "msg": "Link de reset enviado (verifique o terminal para teste)."
+    }), 200
 
 
 @app.post("/api/auth/resetar-senha")
 @jwt_required()
 def resetar_senha():
-    """Reseta a senha do usuario logado (com token de reset valido)."""
+    """
+    Reseta a senha do usuario logado (com token de reset valido).
+    Cache: ❌ SEM cache (dados do banco sempre frescos)
+    """
     user_id = int(get_jwt_identity())
     dados = request.get_json(silent=True) or {}
     nova_senha = dados.get("nova_senha") or ""
 
     if len(nova_senha) < 4:
-        return erro("A senha precisa de pelo menos 4 caracteres.")
+        return resposta_sem_cache({"erro": "A senha precisa de pelo menos 4 caracteres."}), 400
 
     user = User.query.get(user_id)
     user.set_senha(nova_senha)
     db.session.commit()
-    return jsonify({"ok": True, "msg": "Senha alterada com sucesso!"}), 200
+    return resposta_sem_cache({"ok": True, "msg": "Senha alterada com sucesso!"}), 200
 
 
 @app.post("/api/admin/sync-resultados")
 @jwt_required()
 def sync_resultados():
-    """Sincroniza resultados com a API football-data.org"""
+    """
+    Sincroniza resultados com a API football-data.org
+    Cache: ❌ SEM cache (dados do banco sempre frescos)
+    """
     from sync_resultados import sincronizar_resultados
 
     sucesso = sincronizar_resultados(app=app, verbose=True, status_filter=None)
 
     if sucesso:
-        return jsonify(
-            {"ok": True, "msg": "Resultados sincronizados com sucesso!"}
-        ), 200
+        return resposta_sem_cache({
+            "ok": True, 
+            "msg": "Resultados sincronizados com sucesso!"
+        }), 200
     else:
-        return jsonify({"ok": False, "erro": "Falha ao sincronizar"}), 500
+        return resposta_sem_cache({
+            "ok": False, 
+            "erro": "Falha ao sincronizar"
+        }), 500
 
 
 @app.post("/api/auth/atualizar-perfil")
 @jwt_required()
 def atualizar_perfil():
-    """Atualiza o perfil do usuario logado (nome)."""
+    """
+    Atualiza o perfil do usuario logado (nome).
+    Cache: ❌ SEM cache (dados do banco sempre frescos)
+    """
     user_id = int(get_jwt_identity())
     dados = request.get_json(silent=True) or {}
     nome = (dados.get("nome") or "").strip()
 
     if not nome:
-        return erro("Nome não pode estar vazio.")
+        return resposta_sem_cache({"erro": "Nome não pode estar vazio."}), 400
 
     user = User.query.get(user_id)
     user.nome = nome
     db.session.commit()
 
-    return jsonify(
-        {"ok": True, "user": {"id": user.id, "nome": user.nome, "email": user.email}}
-    ), 200
+    return resposta_sem_cache({
+        "ok": True, 
+        "user": {"id": user.id, "nome": user.nome, "email": user.email}
+    }), 200
 
 
 if __name__ == "__main__":

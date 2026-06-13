@@ -1,13 +1,14 @@
 import { Component, OnInit } from '@angular/core';
+import { DatePipe, CommonModule } from '@angular/common';
 import { ApiService } from '../core/api.service';
-import { RankingItem } from '../core/models';
+import { RankingItem, Jogo } from '../core/models';
 import { AuthService } from '../core/auth.service';
 import { SincronizacaoService } from '../core/sincronizacao.service';
 
 @Component({
   selector: 'app-ranking',
   standalone: true,
-  imports: [],
+  imports: [DatePipe, CommonModule],
   template: `
     <main class="conteudo">
     <h1 class="titulo-pagina">Mais acertos</h1>
@@ -36,6 +37,7 @@ import { SincronizacaoService } from '../core/sincronizacao.service';
             <th>Apostas certas</th>
             <th>Apostas pontuadas</th>
             <th>Apostas totais</th>
+            <th>Jogos ✅</th>
             @if (jogoConcluido > 0) {
               <th>Pé frio 🥶</th>
             }
@@ -51,6 +53,12 @@ import { SincronizacaoService } from '../core/sincronizacao.service';
               <td class="num">{{ item.acertos }}</td>
               <td class="num">{{ item.apostas_pontuadas }}</td>
               <td class="num">{{ item.apostas }}</td>
+              <td class="num">
+                <button (click)="abrirJogos(item)" 
+                        style="background: var(--campo); color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-weight: 700; font-size: 12px;">
+                  {{ item.apostas_pontuadas }}
+                </button>
+              </td>
               @if (jogoConcluido > 0) {
                 <td class="num">🥶 {{ peFreioCount(item) }}</td>
               }
@@ -58,6 +66,57 @@ import { SincronizacaoService } from '../core/sincronizacao.service';
           }
         </tbody>
       </table>
+    }
+
+    <!-- MODAL COM JOGOS EM QUE PONTUOU -->
+    @if (participanteComFoco) {
+      <div style="position: fixed; inset: 0; background: rgba(0,0,0,0.7); display: flex; align-items: center; justify-content: center; z-index: 1000;" 
+           (click)="participanteComFoco = null">
+        <div style="background: white; border-radius: 12px; padding: 20px; max-width: 600px; max-height: 80vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,0.3);" 
+             (click)="$event.stopPropagation()">
+          
+          <h3 style="font-family: var(--fonte-display); margin-bottom: 16px; text-align: center;">
+            Jogos em que {{ participanteComFoco.nome }} pontuou ✅
+          </h3>
+
+          @if (jogosComPontos.length === 0) {
+            <p style="text-align: center; color: var(--tinta-fraca);">Nenhum jogo com pontuação.</p>
+          } @else {
+            <div style="display: flex; flex-direction: column; gap: 12px;">
+              @for (jogo of jogosComPontos; track jogo.id) {
+                <div style="padding: 12px; background: #f9f9f9; border-radius: 8px; border-left: 4px solid var(--campo);">
+                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                    <strong>{{ jogo.time1.nome }} × {{ jogo.time2.nome }}</strong>
+                    <span style="font-size: 12px; color: var(--tinta-fraca);">{{ jogo.data_hora | date:'dd/MM HH:mm' }}</span>
+                  </div>
+                  
+                  <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <div style="font-family: var(--fonte-placar); font-weight: 700; font-size: 18px;">
+                      {{ jogo.gols_time1 }} × {{ jogo.gols_time2 }}
+                    </div>
+                    
+                    @if (jogo.minha_aposta && jogo.minha_aposta.gols_time1 !== null && jogo.minha_aposta.gols_time2 !== null) {
+                      <div style="text-align: right;">
+                        <div style="font-weight: 700; font-size: 14px;">
+                          Palpite: {{ jogo.minha_aposta.gols_time1 }}×{{ jogo.minha_aposta.gols_time2 }}
+                        </div>
+                        <div style="font-weight: 700; color: var(--campo); background: #fff8e1; padding: 4px 8px; border-radius: 4px; margin-top: 4px;">
+                          {{ jogo.minha_aposta.pontos }} pts
+                        </div>
+                      </div>
+                    }
+                  </div>
+                </div>
+              }
+            </div>
+          }
+
+          <button (click)="participanteComFoco = null" 
+                  style="width: 100%; margin-top: 16px; padding: 12px; background: var(--campo); color: white; border: none; border-radius: 6px; font-weight: 700; cursor: pointer;">
+            Fechar
+          </button>
+        </div>
+      </div>
     }
     </main>
   `,
@@ -67,7 +126,11 @@ export class RankingComponent implements OnInit {
   carregando = true;
   meuNome = '';
   peFreio: string = '';
-  jogoConcluido = 0;  // ✅ Contar jogos concluídos
+  jogoConcluido = 0;
+
+  // ✅ NOVO: Para modal de jogos
+  participanteComFoco: RankingItem | null = null;
+  jogosComPontos: any[] = [];
 
   constructor(private api: ApiService, private sincronizacaoService: SincronizacaoService, auth: AuthService) {
     this.meuNome = auth.usuario()?.nome ?? '';
@@ -102,5 +165,40 @@ export class RankingComponent implements OnInit {
     // ✅ CORRETO: Usa apenas apostas em jogos concluídos
     return (item.apostas_em_jogos_concluidos ?? 0) 
           - (item.apostas_pontuadas_em_jogos_concluidos ?? 0);
+  }
+
+  // ✅ NOVO: Abre modal com jogos em que pontuou
+  abrirJogos(item: RankingItem) {
+    this.participanteComFoco = item;
+    this.jogosComPontos = [];
+
+    // ✅ Busca todos os jogos encerrados
+    this.api.jogos('todos').subscribe(jogos => {
+      const jogosEncerrados = jogos.filter(j => j.encerrado);
+      const jogosFinais: any[] = [];
+
+      // ✅ Para cada jogo, busca os detalhes e encontra a aposta do participante (por EMAIL)
+      jogosEncerrados.forEach(jogo => {
+        this.api.apostasDoJogo(jogo.id).subscribe(detalhe => {
+          // ✅ Encontra a aposta do participante comparando por EMAIL
+          const apostaDoParticipante = detalhe.apostas.find(
+            aposta => aposta.email === item.email // ✅ COMPARAÇÃO POR EMAIL!
+          );
+
+          // ✅ Se encontrou aposta e tem pontos, adiciona à lista
+          if (apostaDoParticipante && apostaDoParticipante.pontos > 0) {
+            jogosFinais.push({
+              ...jogo,
+              minha_aposta: apostaDoParticipante
+            });
+            
+            // ✅ Atualiza a lista (ordenada por data)
+            this.jogosComPontos = jogosFinais.sort((a, b) => 
+              new Date(a.data_hora).getTime() - new Date(b.data_hora).getTime()
+            );
+          }
+        });
+      });
+    });
   }
 }

@@ -34,6 +34,7 @@ export interface ApostasDoJogo { jogo: Jogo; liberado: boolean; apostas: Aposta[
 
 export interface RankingItem {
   posicao: number; nome: string; pontos: number;
+  email: string;
   exatos: number; acertos: number; apostas: number;
   apostas_pontuadas: number;
   apostas_em_jogos_concluidos?: number;
