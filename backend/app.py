@@ -612,6 +612,9 @@ def subscribe_notifications():
     """
     ✅ Cliente envia sua subscription do Service Worker
     O servidor armazena para enviar push depois
+    Aceita ambos os formatos:
+    1. {endpoint, auth, p256dh}
+    2. {endpoint, keys: {auth, p256dh}}
     """
     from models import NotificationSubscription
 
@@ -619,8 +622,10 @@ def subscribe_notifications():
     dados = request.get_json(silent=True) or {}
 
     endpoint = dados.get("endpoint")
-    auth = dados.get("keys", {}).get("auth")
-    p256dh = dados.get("keys", {}).get("p256dh")
+    
+    # ✅ NOVO: Aceita ambos os formatos
+    auth = dados.get("auth") or dados.get("keys", {}).get("auth")
+    p256dh = dados.get("p256dh") or dados.get("keys", {}).get("p256dh")
 
     if not endpoint or not auth or not p256dh:
         return resposta_sem_cache({"erro": "Dados de subscription incompletos."}), 400

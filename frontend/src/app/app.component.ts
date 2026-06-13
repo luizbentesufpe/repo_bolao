@@ -100,19 +100,52 @@ export class AppComponent implements OnInit, OnDestroy {
   ) {}
 
   ngOnInit() {
-    // ✅ SINCRONIZAR notificações (navegador + banco)
     if (this.auth.logado) {
+      // ✅ SINCRONIZAR notificações (navegador + banco)
       this.notifPermission.sincronizarNotificacoes().catch(e => {
         console.error('❌ Erro ao sincronizar:', e);
       });
-    }
 
-    // ✅ Mostrar modal se usuário logou e não foi perguntado ainda
-    if (this.auth.logado && !this.notifPermission.foiPerguntado()) {
+      // ✅ Verificar se estão dessincronizadas
       setTimeout(() => {
+        this.verificarNotificacoesDessincronizadas();
+      }, 1000);
+    }
+  }
+
+  /**
+   * ✅ Verifica se notificações estão dessincronizadas
+   * Se estiverem, mostra o modal novamente
+   */
+  async verificarNotificacoesDessincronizadas() {
+    try {
+      const status = await this.notifPermission.verificarStatusReal();
+
+      // ❌ CENÁRIO 1: Navegador granted mas Banco vazio
+      if (status.navegador === 'granted' && !status.banco) {
+        console.log('⚠️ Notificação ativa no navegador mas não no banco!');
         this.mostrarModalNotif = true;
-        console.log('📬 Modal de notificações exibido');
-      }, 2000); // Espera 2 segundos para não incomodar
+        return;
+      }
+
+      // ❌ CENÁRIO 2: Navegador denied mas Banco tem
+      if (status.navegador === 'denied' && status.banco) {
+        console.log('⚠️ Notificação no banco mas negada no navegador!');
+        this.mostrarModalNotif = true;
+        return;
+      }
+
+      // ✅ Caso contrário: tudo sincronizado ou nunca foi perguntado
+      if (this.auth.logado && !this.notifPermission.foiPerguntado()) {
+        setTimeout(() => {
+          this.mostrarModalNotif = true;
+          console.log('📬 Modal de notificações exibido');
+        }, 2000);
+      }
+
+      console.log('✅ Notificações sincronizadas');
+    } catch (e) {
+      console.error('❌ Erro ao verificar dessincronização:', e);
     }
   }
 
@@ -127,10 +160,16 @@ export class AppComponent implements OnInit, OnDestroy {
       if (permissao === 'granted') {
         console.log('✅ Notificações ativadas!');
         this.notifPermission.testarNotificacao();
-        // ✅ Sincronizar após ativar
-        this.notifPermission.sincronizarNotificacoes();
+        // ✅ Sincronizar após ativar e verificar
+        setTimeout(() => {
+          this.notifPermission.sincronizarNotificacoes().then(() => {
+            this.verificarNotificacoesDessincronizadas();
+          });
+        }, 500);
       } else {
         console.log('⚠️ Notificações bloqueadas pelo usuário');
+        // ✅ Se foi negado, verificar se precisa remover do banco
+        this.verificarNotificacoesDessincronizadas();
       }
     });
   }
