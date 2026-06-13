@@ -5,10 +5,11 @@ Horarios convertidos de Brasilia (UTC-3) para UTC ao gravar.
 
 Uso:  python seed.py
 """
+
 from datetime import datetime, timedelta
 
 from app import app
-from models import db, Time, Campeonato, Jogo
+from models import Campeonato, Jogo, Time, db
 
 ESTADIOS = {
     "MEX": ("Estádio Azteca", "Cidade do México, México"),
@@ -16,17 +17,17 @@ ESTADIOS = {
     "MTY": ("Estádio BBVA", "Monterrey, México"),
     "TOR": ("BMO Field", "Toronto, Canadá"),
     "VAN": ("BC Place", "Vancouver, Canadá"),
-    "LA":  ("SoFi Stadium", "Los Angeles, EUA"),
-    "SF":  ("Levi's Stadium", "San Francisco/Santa Clara, EUA"),
+    "LA": ("SoFi Stadium", "Los Angeles, EUA"),
+    "SF": ("Levi's Stadium", "San Francisco/Santa Clara, EUA"),
     "SEA": ("Lumen Field", "Seattle, EUA"),
     "HOU": ("NRG Stadium", "Houston, EUA"),
     "DAL": ("AT&T Stadium", "Dallas/Arlington, EUA"),
-    "KC":  ("Arrowhead Stadium", "Kansas City, EUA"),
+    "KC": ("Arrowhead Stadium", "Kansas City, EUA"),
     "ATL": ("Mercedes-Benz Stadium", "Atlanta, EUA"),
     "MIA": ("Hard Rock Stadium", "Miami, EUA"),
     "BOS": ("Gillette Stadium", "Boston/Foxborough, EUA"),
     "PHI": ("Lincoln Financial Field", "Filadélfia, EUA"),
-    "NY":  ("MetLife Stadium", "Nova York/Nova Jersey, EUA"),
+    "NY": ("MetLife Stadium", "Nova York/Nova Jersey, EUA"),
 }
 
 # (data_hora em Brasilia, time1, time2, estadio)
@@ -36,7 +37,7 @@ JOGOS = [
     ("2026-06-11 23:00", "Coreia do Sul", "República Tcheca", "GDL"),
     ("2026-06-12 16:00", "Canadá", "Bósnia e Herzegovina", "TOR"),
     ("2026-06-12 22:00", "Estados Unidos", "Paraguai", "LA"),
-    ("2026-06-13 01:00", "Austrália", "Turquia", "VAN"),
+    ("2026-06-14 01:00", "Austrália", "Turquia", "VAN"),
     ("2026-06-13 16:00", "Catar", "Suíça", "SF"),
     ("2026-06-13 19:00", "Brasil", "Marrocos", "NY"),
     ("2026-06-13 22:00", "Haiti", "Escócia", "BOS"),
@@ -115,8 +116,9 @@ def seed():
 
         campeonato = Campeonato.query.filter_by(nome="Copa do Mundo FIFA 2026").first()
         if campeonato is None:
-            campeonato = Campeonato(nome="Copa do Mundo FIFA 2026",
-                                    local="Estados Unidos, Canadá e México")
+            campeonato = Campeonato(
+                nome="Copa do Mundo FIFA 2026", local="Estados Unidos, Canadá e México"
+            )
             db.session.add(campeonato)
             db.session.flush()
 
@@ -137,22 +139,34 @@ def seed():
             estadio, cidade = ESTADIOS[cod]
             t1, t2 = get_time(n1), get_time(n2)
             # Brasilia (UTC-3) -> UTC
-            data_utc = (datetime.strptime(data_str, "%Y-%m-%d %H:%M")
-                        + timedelta(hours=3))
-            existe = Jogo.query.filter_by(campeonato_id=campeonato.id,
-                                          time1_id=t1.id, time2_id=t2.id,
-                                          data_hora=data_utc).first()
+            data_utc = datetime.strptime(data_str, "%Y-%m-%d %H:%M") + timedelta(
+                hours=3
+            )
+            existe = Jogo.query.filter_by(
+                campeonato_id=campeonato.id,
+                time1_id=t1.id,
+                time2_id=t2.id,
+                data_hora=data_utc,
+            ).first()
             if existe is None:
-                db.session.add(Jogo(campeonato_id=campeonato.id,
-                                    time1_id=t1.id, time2_id=t2.id,
-                                    data_hora=data_utc,
-                                    estadio=estadio, cidade_estado=cidade))
+                db.session.add(
+                    Jogo(
+                        campeonato_id=campeonato.id,
+                        time1_id=t1.id,
+                        time2_id=t2.id,
+                        data_hora=data_utc,
+                        estadio=estadio,
+                        cidade_estado=cidade,
+                    )
+                )
                 criados += 1
 
         db.session.commit()
-        print("Times: %d | Jogos criados: %d (total: %d)"
-              % (Time.query.count(), criados, Jogo.query.count()))
+        print(
+            "Times: %d | Jogos criados: %d (total: %d)"
+            % (Time.query.count(), criados, Jogo.query.count())
+        )
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     seed()

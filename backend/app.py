@@ -757,6 +757,33 @@ def iniciar_scheduler(app):
     print("✅ Scheduler iniciado - Verificando jogos a cada 5 minutos")
 
 
+@app.post("/api/test-notification")
+@jwt_required()
+def test_notification():
+    """Envia notificação de teste para todos"""
+    from models import NotificationSubscription
+
+    subs = NotificationSubscription.query.all()
+
+    if not subs:
+        return resposta_sem_cache({"ok": False, "msg": "Nenhuma subscription"}), 400
+
+    enviadas = 0
+    for sub in subs:
+        result = enviar_push(
+            sub,
+            "🧪 Notificação de Teste!",
+            "Push notifications funcionando!",
+            {"tag": "test-notification"},
+        )
+        if result:
+            enviadas += 1
+
+    return resposta_sem_cache(
+        {"ok": True, "enviadas": enviadas, "total": len(subs)}
+    ), 200
+
+
 # ✅ CORRIGIDO: Criar tabelas e iniciar scheduler corretamente
 if __name__ == "__main__":
     with app.app_context():
