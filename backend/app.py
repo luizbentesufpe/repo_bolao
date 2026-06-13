@@ -84,6 +84,17 @@ def resposta_sem_cache(data):
     return response
 
 
+def criar_usuario_padrao():
+    """Cria usuário de teste se não existir"""
+    user = User.query.filter_by(email="teste@render.com").first()
+    if not user:
+        novo = User(nome="Teste Render", email="teste@render.com")
+        novo.set_senha("123456")
+        db.session.add(novo)
+        db.session.commit()
+        print("✅ Usuário padrão criado: teste@render.com / 123456")
+
+
 # ✅ FUNÇÃO PARA CALCULAR PONTOS
 def calcular_pontos(aposta, jogo):
     """
@@ -788,6 +799,8 @@ def test_notification():
 if __name__ == "__main__":
     with app.app_context():
         db.create_all()
+        criar_usuario_padrao()  # ← ADICIONAR ISSO!
+
         print("✅ Banco de dados criado/verificado")
 
     iniciar_scheduler(app)
