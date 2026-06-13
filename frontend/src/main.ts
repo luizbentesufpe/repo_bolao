@@ -5,6 +5,7 @@ import { provideRouter } from '@angular/router';
 import { environment } from './environment/environment';
 import { routes } from './app/app.routes';
 import { AppComponent } from './app/appcomponent/app.component';
+import { authInterceptor } from './app/core/auth.interceptor';
 
 if ('serviceWorker' in navigator && environment.production) {
   window.addEventListener('load', async () => {
@@ -36,7 +37,7 @@ if ('serviceWorker' in navigator && environment.production) {
 
 bootstrapApplication(AppComponent, {
   providers: [
-    provideHttpClient(withInterceptors([])),
+    provideHttpClient(withInterceptors([authInterceptor])),
     provideRouter(routes)
   ]
 }).catch(err => console.error(err));
