@@ -126,7 +126,7 @@ class Jogo(db.Model):
             "campeonato": self.campeonato.to_dict(),
             "time1": self.time1.to_dict(),
             "time2": self.time2.to_dict(),
-            "data_hora": self.data_hora.isoformat(),
+            "data_hora": self.data_hora.isoformat() + "Z",
             "gols_time1": self.gols_time1,
             "gols_time2": self.gols_time2,
             "estadio": self.estadio,
