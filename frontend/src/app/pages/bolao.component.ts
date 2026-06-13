@@ -24,215 +24,496 @@ interface JogoComPalpite extends Jogo {
   <h1 class="titulo-pagina">Fazer bolão</h1>
 
   <p class="subtitulo">
-
     Dê seu palpite até a bola rolar. Placar exato vale 5 pontos,
-
-    acertar o vencedor vale 4 e acertar o empate vale 2.
-
+    acertar o vencedor vale 2 e acertar um gol vale 1.
   </p>
 
-  <!-- ✅ CARD DE CRITÉRIOS BONITO -->
-
-  <div style="background: linear-gradient(135deg, rgba(255,199,44,0.1) 0%, rgba(14,122,60,0.1) 100%); border: 2px solid var(--amarelo); border-radius: 12px; padding: 20px; margin-bottom: 24px;">
-
-    <h3 style="font-family: var(--fonte-display); font-size: 14px; text-transform: uppercase; color: var(--tinta); margin-bottom: 16px; letter-spacing: 1px;">
-
-      🏆 Critérios de pontuação
-
-    </h3>
-
-    
-
-    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
-
+  <!-- ✅ CARD DE CRITÉRIOS (RESPONSIVO) -->
+  <div class="card-criterios">
+    <h3 class="card-titulo">🏆 Critérios de pontuação</h3>
+    <div class="grid-criterios">
       <!-- Exato -->
-
-      <div style="padding: 12px; background: white; border-radius: 8px; border-left: 4px solid var(--campo);">
-
-        <div style="font-weight: 700; color: var(--campo); font-size: 18px;">5</div>
-
-        <div style="font-size: 12px; color: var(--tinta-fraca);">Placar exato</div>
-
-        <div style="font-size: 11px; color: #999; margin-top: 4px;">2×0 = 2×0 ✓</div>
-
+      <div class="criterio">
+        <div class="points">5</div>
+        <div class="label">Placar exato</div>
+        <div class="example">2×0 = 2×0 ✓</div>
       </div>
 
       <!-- Vencedor -->
-
-      <div style="padding: 12px; background: white; border-radius: 8px; border-left: 4px solid var(--amarelo);">
-
-        <div style="font-weight: 700; color: var(--amarelo); font-size: 18px;">2</div>
-
-        <div style="font-size: 12px; color: var(--tinta-fraca);">Vencedor/Empate</div>
-
-        <div style="font-size: 11px; color: #999; margin-top: 4px;">3×1 = 2×1 ✓</div>
-
+      <div class="criterio">
+        <div class="points">2</div>
+        <div class="label">Vencedor/Empate</div>
+        <div class="example">3×1 = 2×1 ✓</div>
       </div>
 
       <!-- Gols parcial -->
-
-      <div style="padding: 12px; background: white; border-radius: 8px; border-left: 4px solid #666;">
-
-        <div style="font-weight: 700; color: #666; font-size: 18px;">1</div>
-
-        <div style="font-size: 12px; color: var(--tinta-fraca);">Gols de uma equipe</div>
-
-        <div style="font-size: 11px; color: #999; margin-top: 4px;">2×0 = 2×1 ✓</div>
-
+      <div class="criterio">
+        <div class="points">1</div>
+        <div class="label">Gols de uma equipe</div>
+        <div class="example">2×0 = 2×1 ✓</div>
       </div>
 
       <!-- Errou -->
+      <div class="criterio errou">
+        <div class="points">0</div>
+        <div class="label">Resultado incorreto</div>
+        <div class="example">1×1 = 2×0 ✗</div>
+      </div>
+    </div>
+  </div>
 
-      <div style="padding: 12px; background: white; border-radius: 8px; border-left: 4px solid #ddd;">
+  <!-- ✅ CARD DO PÉ FRIO (RESPONSIVO) -->
+  <div class="card-pe-frio">
+    <h3 class="card-titulo">🥶 O que é Pé Frio?</h3>
+    <p class="card-descricao">
+      Pé frio mede quem acertou menos! Quanto <strong>MAIOR</strong> o número, pior foi o desempenho.
+    </p>
+    <div class="card-exemplo">
+      <div class="exemplo-item">
+        <strong>Você:</strong> 3 jogos, 3 acertos → <span class="bom">0 pé frio</span> (Melhor!)
+      </div>
+      <div class="exemplo-item">
+        <strong>Amigo:</strong> 3 jogos, 1 acerto → <span class="ruim">9 pé frio</span> (Maior! 🥶)
+      </div>
+    </div>
+  </div>
 
-        <div style="font-weight: 700; color: #999; font-size: 18px;">0</div>
+  @if (carregando) {
+    <p class="vazio">Carregando jogos…</p>
+  } @else if (dias.length === 0) {
+    <p class="vazio">Nenhum jogo no momento.</p>
+  }
 
-        <div style="font-size: 12px; color: var(--tinta-fraca);">Resultado incorreto</div>
-
-        <div style="font-size: 11px; color: #999; margin-top: 4px;">1×1 = 2×0 ✗</div>
-
+  @for (dia of dias; track dia.chave) {
+    <!-- JOGOS ABERTOS -->
+    @if (dia.jogosAbertos.length > 0) {
+      <div class="dia-grupo">
+        <span class="rotulo">{{ dia.data | date:'EEEE, d \\'de\\' MMMM' }}</span>
       </div>
 
-    </div>
-
-  </div>
-
-
-<!-- ✅ CARD DO PÉ FRIO (SIMPLIFICADO) -->
-<div style="background: linear-gradient(135deg, rgba(255,107,107,0.1) 0%, rgba(100,100,100,0.1) 100%); border: 2px solid #ff6b6b; border-radius: 12px; padding: 20px; margin-bottom: 24px;">
-  <h3 style="font-family: var(--fonte-display); font-size: 14px; text-transform: uppercase; color: var(--tinta); margin-bottom: 12px; letter-spacing: 1px;">
-    🥶 O que é Pé Frio?
-  </h3>
-  <p style="font-size: 13px; color: var(--tinta-fraca); margin: 0 0 12px 0; line-height: 1.6;">
-    Pé frio mede quem acertou menos! Quanto <strong>MAIOR</strong> o número, pior foi o desempenho.
-  </p>
-  <div style="background: white; padding: 12px; border-radius: 8px; border-left: 4px solid #ff6b6b;">
-    <div style="font-size: 12px; color: #666; font-family: 'Courier New', monospace; line-height: 1.8;">
-      <strong>Cálculo:</strong><br>
-      Pé Frio = (Jogos − Acertos) + (Máx Pontos − Seus Pontos)<br><br>
-      <strong>Exemplo:</strong><br>
-      • Você: 3 jogos, 3 acertos, 8 pontos<br>
-      &nbsp;&nbsp;&nbsp;→ (3−3) + (8−8) = <strong style="color: var(--campo);">0 pé frio</strong> (Melhor!)<br><br>
-      • Amigo: 3 jogos, 1 acerto, 1 ponto<br>
-      &nbsp;&nbsp;&nbsp;→ (3−1) + (8−1) = <strong style="color: #ff6b6b;">9 pé frio</strong> (Maior! 🥶)
-    </div>
-  </div>
-</div>
-
-      @if (carregando) {
-        <p class="vazio">Carregando jogos…</p>
-      } @else if (dias.length === 0) {
-        <p class="vazio">Nenhum jogo no momento.</p>
-      }
-
-      @for (dia of dias; track dia.chave) {
-        <!-- JOGOS ABERTOS -->
-        @if (dia.jogosAbertos.length > 0) {
-          <div class="dia-grupo">
-            <span class="rotulo">{{ dia.data | date:'EEEE, d \\'de\\' MMMM' }}</span>
+      @for (jogo of dia.jogosAbertos; track jogo.id) {
+        <article class="jogo-card">
+          <!-- ✅ LAYOUT MOBILE: stack vertical -->
+          <div class="jogo-header">
+            <div class="jogo-time-mobile">
+              <img [src]="jogo.time1.nome | bandeira" [alt]="jogo.time1.nome" class="bandeira">
+              <span class="time-nome">{{ jogo.time1.nome }}</span>
+            </div>
+            <div class="jogo-time-mobile">
+              <span class="time-nome">{{ jogo.time2.nome }}</span>
+              <img [src]="jogo.time2.nome | bandeira" [alt]="jogo.time2.nome" class="bandeira">
+            </div>
           </div>
 
-          @for (jogo of dia.jogosAbertos; track jogo.id) {
-            <article class="jogo-card">
-              <div class="jogo-time">
-                <img [src]="jogo.time1.nome | bandeira" 
-                     [alt]="jogo.time1.nome" 
-                     style="width: 32px; height: 24px; margin-right: 8px;">
-                {{ jogo.time1.nome }}
-              </div>
+          <!-- PALPITE -->
+          <div class="palpite-container">
+            <input type="number" min="0" max="99" [(ngModel)]="jogo.palpite1" 
+                   [disabled]="!estaAberto(jogo)"
+                   [attr.aria-label]="'Gols de ' + jogo.time1.nome"
+                   class="input-palpite">
+            <span class="x">×</span>
+            <input type="number" min="0" max="99" [(ngModel)]="jogo.palpite2" 
+                   [disabled]="!estaAberto(jogo)"
+                   [attr.aria-label]="'Gols de ' + jogo.time2.nome"
+                   class="input-palpite">
+          </div>
 
-              <div class="placar">
-                <input type="number" min="0" max="99" [(ngModel)]="jogo.palpite1" 
-                       [disabled]="!estaAberto(jogo)"
-                       [attr.aria-label]="'Gols de ' + jogo.time1.nome">
-                <span class="x">×</span>
-                <input type="number" min="0" max="99" [(ngModel)]="jogo.palpite2" 
-                       [disabled]="!estaAberto(jogo)"
-                       [attr.aria-label]="'Gols de ' + jogo.time2.nome">
-              </div>
+          <!-- INFORMAÇÕES DO JOGO -->
+          <div class="jogo-info">
+            <div class="info-row">
+              <span class="info-label">⏰</span>
+              <span>{{ jogo.data_hora | date:'HH:mm' }}</span>
+            </div>
+            <div class="info-row">
+              <span class="info-label">📍</span>
+              <span class="info-texto">{{ jogo.estadio }}</span>
+            </div>
+            <div class="info-row">
+              <span class="info-label">📌</span>
+              <span class="info-texto">{{ jogo.cidade_estado }}</span>
+            </div>
+          </div>
 
-              <div class="jogo-time dir">
-                {{ jogo.time2.nome }}
-                <img [src]="jogo.time2.nome | bandeira" 
-                     [alt]="jogo.time2.nome" 
-                     style="width: 32px; height: 24px; margin-left: 8px;">
-              </div>
-
-              <div class="jogo-meta">
-                <span>{{ jogo.data_hora | date:'HH:mm' }}</span>
-                <span>{{ jogo.estadio }} — {{ jogo.cidade_estado }}</span>
-                <span style="margin-left:auto; display:flex; gap:8px; align-items:center;">
-                  @if (jogo.erro) { 
-                    <span style="color:var(--vermelho); font-size:12px;">{{ jogo.erro }}</span> 
-                  }
-                  @if (jogo.salvo) { 
-                    <span style="color:var(--campo); font-weight:700; font-size:12px;">Palpite salvo ✓</span> 
-                  }
-                  <button class="btn" (click)="salvar(jogo)"
-                          [disabled]="!estaAberto(jogo) || jogo.salvando || jogo.palpite1 === null || jogo.palpite2 === null"
-                          style="font-size:12px; padding:8px 12px;">
-                    {{ jogo.minha_aposta ? 'Atualizar' : 'Salvar' }}
-                  </button>
-                </span>
-              </div>
-            </article>
-          }
-        }
-
-        <!-- JOGOS ENCERRADOS (CORTINA) -->
-        @if (dia.jogosEncerrados.length > 0) {
-          <div class="cortina-encerrados">
-            <button class="btn-cortina" (click)="dia.expandido = !dia.expandido">
-              {{ dia.expandido ? '▼' : '▶' }} 🏁 {{ dia.jogosEncerrados.length }} jogo(s) encerrado(s)
+          <!-- STATUS E BOTÃO -->
+          <div class="jogo-rodape">
+            @if (jogo.erro) { 
+              <span class="status-erro">{{ jogo.erro }}</span> 
+            }
+            @if (jogo.salvo) { 
+              <span class="status-sucesso">✓ Salvo</span> 
+            }
+            <button class="btn" (click)="salvar(jogo)"
+                    [disabled]="!estaAberto(jogo) || jogo.salvando || jogo.palpite1 === null || jogo.palpite2 === null"
+                    [class.salvando]="jogo.salvando">
+              @if (jogo.salvando) {
+                ⏳ Salvando...
+              } @else {
+                {{ jogo.minha_aposta ? '✏️ Atualizar' : '💾 Salvar' }}
+              }
             </button>
+          </div>
+        </article>
+      }
+    }
 
-            @if (dia.expandido) {
-              <div class="jogos-expandidos">
-                @for (jogo of dia.jogosEncerrados; track jogo.id) {
-                  <article class="jogo-card encerrado">
-                    <div class="jogo-time">
-                      <img [src]="jogo.time1.nome | bandeira" [alt]="jogo.time1.nome" 
-                           style="width: 32px; height: 24px; margin-right: 8px;">
-                      {{ jogo.time1.nome }}
-                    </div>
+    <!-- JOGOS ENCERRADOS (CORTINA) -->
+    @if (dia.jogosEncerrados.length > 0) {
+      <div class="cortina-encerrados">
+        <button class="btn-cortina" (click)="dia.expandido = !dia.expandido">
+          {{ dia.expandido ? '▼' : '▶' }} 🏁 {{ dia.jogosEncerrados.length }} jogo(s) encerrado(s)
+        </button>
 
-                    <div class="placar">
-                      <span class="digito">{{ jogo.gols_time1 }}</span>
-                      <span class="x">×</span>
-                      <span class="digito">{{ jogo.gols_time2 }}</span>
-                    </div>
+        @if (dia.expandido) {
+          <div class="jogos-expandidos">
+            @for (jogo of dia.jogosEncerrados; track jogo.id) {
+              <article class="jogo-card encerrado">
+                <div class="jogo-header">
+                  <div class="jogo-time-mobile">
+                    <img [src]="jogo.time1.nome | bandeira" [alt]="jogo.time1.nome" class="bandeira">
+                    <span class="time-nome">{{ jogo.time1.nome }}</span>
+                  </div>
+                  <div class="jogo-time-mobile">
+                    <span class="time-nome">{{ jogo.time2.nome }}</span>
+                    <img [src]="jogo.time2.nome | bandeira" [alt]="jogo.time2.nome" class="bandeira">
+                  </div>
+                </div>
 
-                    <div class="jogo-time dir">
-                      {{ jogo.time2.nome }}
-                      <img [src]="jogo.time2.nome | bandeira" [alt]="jogo.time2.nome" 
-                           style="width: 32px; height: 24px; margin-left: 8px;">
-                    </div>
+                <div class="placar-final">
+                  <span class="digito">{{ jogo.gols_time1 }}</span>
+                  <span class="x">×</span>
+                  <span class="digito">{{ jogo.gols_time2 }}</span>
+                </div>
 
-                    <div class="jogo-meta">
-                      <span style="font-size: 12px; color: #999;">{{ jogo.data_hora | date:'HH:mm' }}</span>
+                <div class="jogo-info">
+                  <div class="info-row">
+                    <span class="info-label">⏰</span>
+                    <span>{{ jogo.data_hora | date:'HH:mm' }}</span>
+                  </div>
+                </div>
 
-                      @if (jogo.minha_aposta && jogo.minha_aposta.gols_time1 !== null && jogo.minha_aposta.gols_time2 !== null) { 
-                        <span class="pontos-chip" [class.cheio]="jogo.minha_aposta.pontos > 0">
-                          {{ jogo.minha_aposta.gols_time1 }}×{{ jogo.minha_aposta.gols_time2 }}
-                          · {{ jogo.minha_aposta.pontos }} pts
-                        </span>
-                      }
-                    </div>
-                  </article>
+                @if (jogo.minha_aposta && jogo.minha_aposta.gols_time1 !== null && jogo.minha_aposta.gols_time2 !== null) { 
+                  <div class="pontos-chip" [class.cheio]="jogo.minha_aposta.pontos > 0">
+                    {{ jogo.minha_aposta.gols_time1 }}×{{ jogo.minha_aposta.gols_time2 }}
+                    · {{ jogo.minha_aposta.pontos }} pts
+                  </div>
                 }
-              </div>
+              </article>
             }
           </div>
         }
-      }
-    </main>
+      </div>
+    }
+  }
+</main>
   `,
   styles: [`
+    /* ✅ CARDS DE INFORMAÇÃO */
+    .card-criterios,
+    .card-pe-frio {
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 20px;
+      border: 2px solid;
+    }
+
+    .card-criterios {
+      background: linear-gradient(135deg, rgba(255,199,44,0.1) 0%, rgba(14,122,60,0.1) 100%);
+      border-color: var(--amarelo);
+    }
+
+    .card-pe-frio {
+      background: linear-gradient(135deg, rgba(255,107,107,0.1) 0%, rgba(100,100,100,0.1) 100%);
+      border-color: #ff6b6b;
+    }
+
+    .card-titulo {
+      font-size: 14px;
+      text-transform: uppercase;
+      color: var(--tinta);
+      margin-bottom: 12px;
+      letter-spacing: 1px;
+      font-weight: 700;
+      margin: 0 0 12px 0;
+    }
+
+    .card-descricao {
+      font-size: 13px;
+      color: var(--tinta-fraca);
+      margin: 0 0 12px 0;
+      line-height: 1.6;
+    }
+
+    /* ✅ GRID DE CRITÉRIOS */
+    .grid-criterios {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 12px;
+    }
+
+    .criterio {
+      background: white;
+      padding: 12px;
+      border-radius: 8px;
+      border-left: 4px solid;
+      text-align: center;
+    }
+
+    .criterio:nth-child(1) { border-color: var(--campo); }
+    .criterio:nth-child(2) { border-color: var(--amarelo); }
+    .criterio:nth-child(3) { border-color: #666; }
+    .criterio.errou { border-color: #ddd; }
+
+    .criterio .points {
+      font-weight: 700;
+      font-size: 20px;
+      margin-bottom: 4px;
+      color: var(--tinta);
+    }
+
+    .criterio .label {
+      font-size: 11px;
+      color: var(--tinta-fraca);
+      margin-bottom: 4px;
+    }
+
+    .criterio .example {
+      font-size: 10px;
+      color: #999;
+    }
+
+    /* ✅ CARD PÉ FRIO */
+    .card-exemplo {
+      background: white;
+      padding: 12px;
+      border-radius: 8px;
+      border-left: 4px solid #ff6b6b;
+    }
+
+    .exemplo-item {
+      font-size: 12px;
+      color: #666;
+      margin-bottom: 8px;
+      line-height: 1.6;
+    }
+
+    .exemplo-item:last-child {
+      margin-bottom: 0;
+    }
+
+    .bom {
+      color: var(--campo);
+      font-weight: 700;
+    }
+
+    .ruim {
+      color: #ff6b6b;
+      font-weight: 700;
+    }
+
+    /* ✅ JOGO CARD RESPONSIVO */
+    .jogo-card {
+      background: white;
+      border: 1px solid var(--linha);
+      border-radius: 8px;
+      padding: 16px;
+      margin-bottom: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .jogo-card.encerrado {
+      opacity: 0.7;
+      background: #fafafa;
+    }
+
+    /* ✅ HEADER COM TIMES */
+    .jogo-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .jogo-time-mobile {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex: 1;
+      font-weight: 700;
+      font-size: 14px;
+      color: var(--tinta);
+    }
+
+    .bandeira {
+      width: 32px;
+      height: 24px;
+      border-radius: 2px;
+      flex-shrink: 0;
+    }
+
+    .time-nome {
+      word-break: break-word;
+    }
+
+    /* ✅ PALPITE CONTAINER */
+    .palpite-container {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .input-palpite {
+      width: 70px;
+      height: 50px;
+      font-size: 24px;
+      font-weight: 700;
+      text-align: center;
+      border: 2px solid var(--linha);
+      border-radius: 8px;
+      padding: 4px;
+      font-family: 'IBM Plex Mono', monospace;
+    }
+
+    .input-palpite:focus {
+      border-color: var(--campo);
+      outline: none;
+      box-shadow: 0 0 0 3px rgba(14, 122, 60, 0.1);
+    }
+
+    .input-palpite:disabled {
+      background: #f0f0f0;
+      color: #999;
+    }
+
+    .palpite-container .x {
+      font-weight: 700;
+      font-size: 20px;
+      color: var(--tinta);
+    }
+
+    /* ✅ INFORMAÇÕES DO JOGO */
+    .jogo-info {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      padding: 12px;
+      background: #f9f9f9;
+      border-radius: 6px;
+      font-size: 12px;
+    }
+
+    .info-row {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+    }
+
+    .info-label {
+      font-size: 14px;
+      flex-shrink: 0;
+      width: 16px;
+    }
+
+    .info-texto {
+      color: var(--tinta-fraca);
+      word-break: break-word;
+    }
+
+    /* ✅ RODAPÉ DO CARD */
+    .jogo-rodape {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      justify-content: space-between;
+    }
+
+    .status-erro {
+      color: var(--vermelho);
+      font-size: 12px;
+      font-weight: 600;
+      flex: 1;
+    }
+
+    .status-sucesso {
+      color: var(--campo);
+      font-size: 12px;
+      font-weight: 700;
+      flex: 1;
+    }
+
+    .btn {
+      background: var(--campo);
+      color: white;
+      border: none;
+      padding: 10px 16px;
+      border-radius: 6px;
+      font-weight: 700;
+      cursor: pointer;
+      font-size: 12px;
+      transition: all 0.2s ease;
+      white-space: nowrap;
+    }
+
+    .btn:hover:not(:disabled) {
+      opacity: 0.9;
+      transform: scale(1.05);
+    }
+
+    .btn:disabled {
+      background: #ddd;
+      color: #999;
+      cursor: not-allowed;
+      opacity: 0.6;
+    }
+
+    .btn.salvando {
+      opacity: 0.8;
+    }
+
+    /* ✅ PLACAR FINAL (ENCERRADO) */
+    .placar-final {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      padding: 12px;
+      background: #f9f9f9;
+      border-radius: 6px;
+    }
+
+    .digito {
+      font-size: 28px;
+      font-weight: 700;
+      color: var(--tinta);
+      min-width: 40px;
+      text-align: center;
+    }
+
+    /* ✅ PONTOS CHIP */
+    .pontos-chip {
+      display: inline-block;
+      background: #f0f0f0;
+      color: var(--tinta);
+      padding: 6px 12px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+      margin-top: 8px;
+    }
+
+    .pontos-chip.cheio {
+      background: var(--campo);
+      color: white;
+    }
+
+    /* ✅ CORTINA */
     .cortina-encerrados {
       margin: 20px 0;
       border-top: 2px dashed #ddd;
       padding-top: 16px;
     }
+
     .btn-cortina {
       width: 100%;
       padding: 12px 16px;
@@ -242,16 +523,19 @@ interface JogoComPalpite extends Jogo {
       font-weight: 600;
       color: #666;
       cursor: pointer;
-      font-size: 14px;
+      font-size: 13px;
       transition: all 0.2s ease;
     }
+
     .btn-cortina:hover {
       background: #eee;
     }
+
     .jogos-expandidos {
       margin-top: 12px;
       animation: expandDown 0.3s ease-out;
     }
+
     @keyframes expandDown {
       from {
         opacity: 0;
@@ -263,9 +547,93 @@ interface JogoComPalpite extends Jogo {
         max-height: 5000px;
       }
     }
-    .jogo-card.encerrado {
-      opacity: 0.7;
-      background: #fafafa;
+
+    /* ✅ MOBILE */
+    @media (max-width: 768px) {
+      .grid-criterios {
+        grid-template-columns: 1fr;
+      }
+
+      .jogo-card {
+        padding: 12px;
+        gap: 10px;
+      }
+
+      .input-palpite {
+        width: 60px;
+        height: 45px;
+        font-size: 20px;
+      }
+
+      .jogo-info {
+        padding: 8px;
+        gap: 6px;
+        font-size: 11px;
+      }
+
+      .btn {
+        padding: 10px 12px;
+        font-size: 11px;
+      }
+
+      .card-criterios,
+      .card-pe-frio {
+        padding: 12px;
+      }
+
+      .card-titulo {
+        font-size: 13px;
+        margin-bottom: 10px;
+      }
+
+      .card-descricao {
+        font-size: 12px;
+        margin-bottom: 10px;
+      }
+    }
+
+    /* ✅ EXTRA SMALL */
+    @media (max-width: 480px) {
+      .grid-criterios {
+        grid-template-columns: 1fr;
+      }
+
+      .jogo-time-mobile {
+        font-size: 13px;
+      }
+
+      .bandeira {
+        width: 28px;
+        height: 21px;
+      }
+
+      .input-palpite {
+        width: 50px;
+        height: 40px;
+        font-size: 18px;
+      }
+
+      .palpite-container .x {
+        font-size: 18px;
+      }
+
+      .jogo-rodape {
+        flex-direction: column;
+        align-items: stretch;
+      }
+
+      .status-erro,
+      .status-sucesso {
+        text-align: center;
+      }
+
+      .btn {
+        width: 100%;
+      }
+
+      .criterio .points {
+        font-size: 18px;
+      }
     }
   `]
 })

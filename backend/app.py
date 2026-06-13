@@ -572,5 +572,330 @@ def health():
     return {"status": "ok", "timestamp": datetime.now().isoformat()}, 200
 
 
+@app.get("/api/notifications/status")
+@jwt_required()
+def notificacoes_status():
+    """Verificar se usuário tem subscription de notificações no banco"""
+    from models import NotificationSubscription
+
+    user_id = int(get_jwt_identity())
+    tem_subscription = (
+        NotificationSubscription.query.filter_by(user_id=user_id).first() is not None
+    )
+
+    return resposta_sem_cache({"ativadas": tem_subscription, "user_id": user_id}), 200
+
+
+@app.post("/api/notifications/unsubscribe")
+@jwt_required()
+def desinscrever_notificacoes():
+    """Remove subscription de notificações do banco"""
+    from models import NotificationSubscription
+    
+    user_id = int(get_jwt_identity())
+    subscription = NotificationSubscription.query.filter_by(
+        user_id=user_id
+    ).delete()
+    
+    db.session.commit()
+    
+    return resposta_sem_cache({
+        "ok": True,
+        "msg": "Desincrito com sucesso",
+        "removidas": subscription
+    }), 200
+
+
+@app.post("/api/notifications/subscribe")
+@jwt_required()
+def subscribe_notifications():
+    """
+    ✅ Cliente envia sua subscription do Service Worker
+    O servidor armazena para enviar push depois
+    Aceita ambos os formatos:
+    1. {endpoint, auth, p256dh}
+    2. {endpoint, keys: {auth, p256dh}}
+    """
+    from models import NotificationSubscription
+
+    user_id = int(get_jwt_identity())
+    dados = request.get_json(silent=True) or {}
+
+    endpoint = dados.get("endpoint")
+    
+    # ✅ NOVO: Aceita ambos os formatos
+    auth = dados.get("auth") or dados.get("keys", {}).get("auth")
+    p256dh = dados.get("p256dh") or dados.get("keys", {}).get("p256dh")
+
+    if not endpoint or not auth or not p256dh:
+        return resposta_sem_cache({"erro": "Dados de subscription incompletos."}), 400
+
+    # Verifica se já existe
+    sub = NotificationSubscription.query.filter_by(endpoint=endpoint).first()
+    if sub:
+        sub.user_id = user_id
+        sub.auth = auth
+        sub.p256dh = p256dh
+    else:
+        sub = NotificationSubscription(
+            user_id=user_id, endpoint=endpoint, auth=auth, p256dh=p256dh
+        )
+        db.session.add(sub)
+
+    db.session.commit()
+
+    return resposta_sem_cache(
+        {"ok": True, "msg": "Subscription registrada com sucesso!"}
+    ), 201
+
+
+@app.delete("/api/notifications/unsubscribe")
+@jwt_required()
+def unsubscribe_notifications():
+    """
+    ✅ Remove subscription quando usuário desativa notificações
+    """
+    from models import NotificationSubscription
+
+    user_id = int(get_jwt_identity())
+    dados = request.get_json(silent=True) or {}
+    endpoint = dados.get("endpoint")
+
+    if not endpoint:
+        return resposta_sem_cache({"erro": "Endpoint não fornecido."}), 400
+
+    sub = NotificationSubscription.query.filter_by(
+        user_id=user_id, endpoint=endpoint
+    ).first()
+
+    if sub:
+        db.session.delete(sub)
+        db.session.commit()
+
+    return resposta_sem_cache({"ok": True, "msg": "Unsubscribed"}), 200
+
+
+# ================================================================ FUNÇÕES DE PUSH
+
+def enviar_push(subscription, titulo, mensagem, opcoes=None):
+    """
+    ✅ Envia push notification para um usuário
+    """
+    vapid_public_key = os.getenv("VAPID_PUBLIC_KEY")
+    vapid_private_key = os.getenv("VAPID_PRIVATE_KEY")
+    frontend_url = os.getenv("FRONTEND_URL", "")
+    vapid_claims = {"sub": "mailto:seu-email@example.com"}
+
+    payload = {
+        "title": titulo,
+        "body": mensagem,
+        "icon": f"{frontend_url}/assets/icon-192.png",  # ✅ URL absoluta
+        "badge": f"{frontend_url}/assets/icon-192.png",  # ✅ URL absoluta
+        "tag": opcoes.get("tag", "notificacao") if opcoes else "notificacao",
+        "requireInteraction": opcoes.get("requireInteraction", False)
+        if opcoes
+        else False,
+        **(opcoes or {}),
+    }
+
+    try:
+        webpush(
+            subscription_info={
+                "endpoint": subscription.endpoint,
+                "keys": {"auth": subscription.auth, "p256dh": subscription.p256dh},
+            },
+            data=json.dumps(payload),
+            vapid_public_key=vapid_public_key,
+            vapid_private_key=vapid_private_key,
+            vapid_claims=vapid_claims,
+        )
+        return True
+    except WebPushException as e:
+        print(f"❌ Erro ao enviar push: {e}")
+        if subscription:
+            db.session.delete(subscription)
+            db.session.commit()
+        return False
+
+
+def enviar_push_para_todos(titulo, mensagem, opcoes=None):
+    """
+    ✅ Envia push para todos os usuários inscritos
+    """
+    from models import NotificationSubscription
+
+    subscriptions = NotificationSubscription.query.all()
+    enviadas = 0
+
+    for sub in subscriptions:
+        if enviar_push(sub, titulo, mensagem, opcoes):
+            enviadas += 1
+
+    print(f"✅ Push enviado para {enviadas}/{len(subscriptions)} usuários")
+    return enviadas
+
+
+# ================================================================ ENDPOINTS DE TESTE
+
+@app.post("/api/test-notification")
+@jwt_required()
+def test_notification():
+    """Envia notificação de teste para todos"""
+    from models import NotificationSubscription
+
+    subs = NotificationSubscription.query.all()
+
+    if not subs:
+        return resposta_sem_cache({"ok": False, "msg": "Nenhuma subscription"}), 400
+
+    enviadas = 0
+    for sub in subs:
+        result = enviar_push(
+            sub,
+            "🧪 Notificação de Teste!",
+            "Push notifications funcionando!",
+            {"tag": "test-notification"},
+        )
+        if result:
+            enviadas += 1
+
+    return resposta_sem_cache(
+        {"ok": True, "enviadas": enviadas, "total": len(subs)}
+    ), 200
+
+
+@app.post("/api/test-notification-all")
+@jwt_required()
+def test_notification_all():
+    """
+    ✅ Envia notificação de teste para TODOS os usuários inscritos
+    
+    ⚠️ APENAS PARA TESTE/DEBUG - remova em produção ou proteja com permissões
+    
+    Retorna:
+    {
+        "ok": true,
+        "msg": "Notificação de teste enviada para todos",
+        "enviadas": 5,
+        "total": 5
+    }
+    """
+    from models import NotificationSubscription
+    
+    user_id = int(get_jwt_identity())
+    
+    # ✅ Opcional: só permitir admin
+    # user = User.query.get(user_id)
+    # if user.email != 'luizfrancisco2000@gmail.com':
+    #     return resposta_sem_cache({"erro": "Apenas admin pode usar este endpoint"}), 403
+    
+    subs = NotificationSubscription.query.all()
+    
+    if not subs:
+        return resposta_sem_cache({
+            "ok": False, 
+            "msg": "Nenhuma subscription no banco"
+        }), 400
+    
+    enviadas = 0
+    for sub in subs:
+        result = enviar_push(
+            sub,
+            "🧪 Notificação de Teste para Todos!",
+            "Esta é uma notificação de teste enviada para todos os usuários.",
+            {"tag": "test-notification-all"}
+        )
+        if result:
+            enviadas += 1
+    
+    return resposta_sem_cache({
+        "ok": True,
+        "msg": "Notificação de teste enviada para todos",
+        "enviadas": enviadas,
+        "total": len(subs)
+    }), 200
+
+
+# ================================================================ SCHEDULER PARA ENVIAR LEMBRETES
+
+
+def verificar_jogos_proximos():
+    """
+    ✅ Função que executa a cada 5 minutos para verificar jogos próximos
+    ✅ Usa app context para acessar banco de dados
+    """
+    from models import Jogo, NotificationSubscription
+
+    with app.app_context():  # ✅ CORRIGIDO: app context para acessar DB
+        agora = datetime.now()
+        jogos = Jogo.query.all()
+
+        for jogo in jogos:
+            if jogo.comecou or jogo.encerrado:
+                continue
+
+            minutos_faltando = (jogo.data_hora - agora).total_seconds() / 60
+
+            # ✅ 30 minutos antes
+            if 29 <= minutos_faltando <= 31:
+                titulo = "⚽ Faltam 30 minutos!"
+                mensagem = (
+                    f"{jogo.time1.nome} × {jogo.time2.nome}\nFaça seu palpite agora!"
+                )
+
+                subs = NotificationSubscription.query.all()
+                for sub in subs:
+                    enviar_push(
+                        sub,
+                        titulo,
+                        mensagem,
+                        {"tag": f"jogo-{jogo.id}-30min", "requireInteraction": True},
+                    )
+
+            # ✅ 10 minutos antes
+            if 9 <= minutos_faltando <= 11:
+                titulo = "⚽ Faltam 10 minutos!"
+                mensagem = (
+                    f"{jogo.time1.nome} × {jogo.time2.nome}\nFaça seu palpite agora!"
+                )
+
+                subs = NotificationSubscription.query.all()
+                for sub in subs:
+                    enviar_push(
+                        sub,
+                        titulo,
+                        mensagem,
+                        {"tag": f"jogo-{jogo.id}-10min", "requireInteraction": True},
+                    )
+
+
+def iniciar_scheduler(app):
+    """
+    ✅ Inicia o scheduler de background
+    """
+    scheduler = BackgroundScheduler()
+
+    # Executa a cada 5 minutos
+    scheduler.add_job(
+        func=verificar_jogos_proximos,  # ✅ CORRIGIDO: sem lambda
+        trigger="interval",
+        minutes=5,
+        id="check_upcoming_games",
+        name="Verificar jogos próximos",
+        replace_existing=True,
+    )
+
+    scheduler.start()
+    print("✅ Scheduler iniciado - Verificando jogos a cada 5 minutos")
+
+
+# ✅ CORRIGIDO: Criar tabelas e iniciar scheduler corretamente
 if __name__ == "__main__":
+    with app.app_context():
+        db.create_all()
+        criar_usuario_padrao()
+
+        print("✅ Banco de dados criado/verificado")
+
+    iniciar_scheduler(app)
     app.run(debug=True)
