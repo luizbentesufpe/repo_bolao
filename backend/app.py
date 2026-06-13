@@ -226,6 +226,12 @@ def listar_jogos():
     Tempo: < 500ms
     Cache: ❌ SEM cache (dados sempre frescos)
     """
+    # 🔍 DEBUG
+    from flask import request as flask_request
+    auth_header = flask_request.headers.get('Authorization')
+    user_id = get_jwt_identity()
+    print(f"🔍 Auth header: {auth_header}")
+    print(f"🔍 user_id decodificado: {user_id}")
     query = Jogo.query.order_by(Jogo.data_hora)
     user_id = get_jwt_identity()
     minhas = {}
