@@ -675,8 +675,58 @@ def unsubscribe_notifications():
     return resposta_sem_cache({"ok": True, "msg": "Unsubscribed"}), 200
 
 
-# ================================================================ FUNÇÕES DE PUSH
+@app.post("/api/test-notification-all")
+@jwt_required()
+def test_notification_all():
+    """
+    ✅ Envia notificação de teste para TODOS os usuários inscritos
+    
+    ⚠️ APENAS PARA TESTE/DEBUG - removra em produção ou proteja com permissões
+    
+    Retorna:
+    {
+        "ok": true,
+        "msg": "Notificação de teste enviada para todos",
+        "enviadas": 5,
+        "total": 5
+    }
+    """
+    from models import NotificationSubscription
+    
+    user_id = int(get_jwt_identity())
+    
+    # ✅ Opcional: só permitir admin
+    # user = User.query.get(user_id)
+    # if user.email != 'luizfrancisco2000@gmail.com':
+    #     return resposta_sem_cache({"erro": "Apenas admin pode usar este endpoint"}), 403
+    
+    subs = NotificationSubscription.query.all()
+    
+    if not subs:
+        return resposta_sem_cache({
+            "ok": False, 
+            "msg": "Nenhuma subscription no banco"
+        }), 400
+    
+    enviadas = 0
+    for sub in subs:
+        result = enviar_push(
+            sub,
+            "🧪 Notificação de Teste para Todos!",
+            "Esta é uma notificação de teste enviada para todos os usuários.",
+            {"tag": "test-notification-all"}
+        )
+        if result:
+            enviadas += 1
+    
+    return resposta_sem_cache({
+        "ok": True,
+        "msg": f"Notificação de teste enviada para todos",
+        "enviadas": enviadas,
+        "total": len(subs)
+    }), 200
 
+# ================================================================ FUNÇÕES DE PUSH
 
 def enviar_push(subscription, titulo, mensagem, opcoes=None):
     """
@@ -684,13 +734,14 @@ def enviar_push(subscription, titulo, mensagem, opcoes=None):
     """
     vapid_public_key = os.getenv("VAPID_PUBLIC_KEY")
     vapid_private_key = os.getenv("VAPID_PRIVATE_KEY")
+    frontend_url = os.getenv("FRONTEND_URL", "")
     vapid_claims = {"sub": "mailto:seu-email@example.com"}
 
     payload = {
         "title": titulo,
         "body": mensagem,
-        "icon": "/assets/icon-192.png",
-        "badge": "/assets/icon-192.png",
+        "icon": f"{frontend_url}/assets/icon-192.png",  # ✅ URL absoluta
+        "badge": f"{frontend_url}/assets/icon-192.png",  # ✅ URL absoluta
         "tag": opcoes.get("tag", "notificacao") if opcoes else "notificacao",
         "requireInteraction": opcoes.get("requireInteraction", False)
         if opcoes
@@ -700,7 +751,7 @@ def enviar_push(subscription, titulo, mensagem, opcoes=None):
 
     try:
         webpush(
-            subscription={
+            subscription_info={
                 "endpoint": subscription.endpoint,
                 "keys": {"auth": subscription.auth, "p256dh": subscription.p256dh},
             },
@@ -712,7 +763,6 @@ def enviar_push(subscription, titulo, mensagem, opcoes=None):
         return True
     except WebPushException as e:
         print(f"❌ Erro ao enviar push: {e}")
-        # Remover subscription inválida
         if subscription:
             db.session.delete(subscription)
             db.session.commit()
