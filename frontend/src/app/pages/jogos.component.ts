@@ -282,6 +282,10 @@ export class JogosComponent implements OnInit, OnDestroy {
     this.periodo = periodo;
     this.carregando = true;
     this.api.jogos('todos').subscribe(jogos => {
+      jogos = jogos.map(j => ({
+        ...j,
+        data_hora: new Date(j.data_hora)
+      })) as any;
       const agora = new Date();
       const hoje00h = new Date(agora.getFullYear(), agora.getMonth(), agora.getDate());
       const hoje23h59 = new Date(hoje00h.getTime() + 86400000 - 1);
