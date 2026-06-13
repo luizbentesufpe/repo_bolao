@@ -52,7 +52,10 @@ CORS(
     app,
     resources={
         r"/api/*": {
-            "origins": ["https://bolao-web-0s5h.onrender.com", "https://repo-bolao-1.onrender.com"],
+            "origins": [
+                "https://bolao-web-0s5h.onrender.com",
+                "https://repo-bolao-1.onrender.com",
+            ],
             "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
             "allow_headers": ["Content-Type", "Authorization"],
         }
@@ -71,9 +74,9 @@ def erro(msg, status=400):
 def resposta_sem_cache(data):
     """Retorna resposta JSON SEM cache (para dados do banco)"""
     response = jsonify(data)
-    response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
-    response.headers['Pragma'] = 'no-cache'
-    response.headers['Expires'] = '0'
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
     return response
 
 
@@ -175,7 +178,9 @@ def register():
     if not nome or not email or not senha:
         return resposta_sem_cache({"erro": "Informe nome, email e senha."}), 400
     if len(senha) < 4:
-        return resposta_sem_cache({"erro": "A senha precisa de pelo menos 4 caracteres."}), 400
+        return resposta_sem_cache(
+            {"erro": "A senha precisa de pelo menos 4 caracteres."}
+        ), 400
     if User.query.filter_by(email=email).first():
         return resposta_sem_cache({"erro": "Esse email ja esta cadastrado."}), 400
 
@@ -185,10 +190,12 @@ def register():
     db.session.commit()
 
     token = create_access_token(identity=str(user.id))
-    return resposta_sem_cache({
-        "token": token,
-        "user": {"id": user.id, "nome": user.nome, "email": user.email},
-    }), 201
+    return resposta_sem_cache(
+        {
+            "token": token,
+            "user": {"id": user.id, "nome": user.nome, "email": user.email},
+        }
+    ), 201
 
 
 @app.post("/api/auth/login")
@@ -202,10 +209,12 @@ def login():
         return resposta_sem_cache({"erro": "Email ou senha invalidos."}), 401
 
     token = create_access_token(identity=str(user.id))
-    return resposta_sem_cache({
-        "token": token,
-        "user": {"id": user.id, "nome": user.nome, "email": user.email},
-    })
+    return resposta_sem_cache(
+        {
+            "token": token,
+            "user": {"id": user.id, "nome": user.nome, "email": user.email},
+        }
+    )
 
 
 # ================================================================ JOGOS - ENDPOINT 1: DADOS (RÁPIDO)
@@ -273,24 +282,28 @@ def sincronizar():
         ultimo_sync = agora
         ultimo_sync_timestamp = agora.isoformat()
         print(f"[{agora.strftime('%H:%M:%S')}] ✅ Sincronização concluída!", flush=True)
-        
-        return jsonify({
-            "ok": True,
-            "msg": "Sincronização concluída",
-            "ultimaSincronizacao": ultimo_sync_timestamp
-        }), 200
+
+        return jsonify(
+            {
+                "ok": True,
+                "msg": "Sincronização concluída",
+                "ultimaSincronizacao": ultimo_sync_timestamp,
+            }
+        ), 200
     else:
         tempo_restante = INTERVALO_SYNC * 60 - (agora - ultimo_sync).total_seconds()
         print(
             f"[{agora.strftime('%H:%M:%S')}] ⏳ Cache ativo (próximo sync em {int(tempo_restante)}s)",
             flush=True,
         )
-        
-        return jsonify({
-            "ok": False,
-            "msg": f"Cache ativo, próximo sync em {int(tempo_restante)}s",
-            "proximaSincronizacao": int(tempo_restante)
-        }), 200
+
+        return jsonify(
+            {
+                "ok": False,
+                "msg": f"Cache ativo, próximo sync em {int(tempo_restante)}s",
+                "proximaSincronizacao": int(tempo_restante),
+            }
+        ), 200
 
 
 # ================================================================ APOSTAS DO JOGO
@@ -312,7 +325,7 @@ def apostas_do_jogo(jogo_id):
         "liberado": not jogo.comecou,
         "apostas": [a.to_dict(com_user=True) for a in apostas_sorted],
     }
-    
+
     return resposta_sem_cache(saida)
 
 
@@ -331,7 +344,9 @@ def salvar_aposta():
     if jogo is None:
         return resposta_sem_cache({"erro": "Jogo nao encontrado."}), 404
     if jogo.comecou:
-        return resposta_sem_cache({"erro": "Apostas encerradas: o jogo ja comecou."}), 422
+        return resposta_sem_cache(
+            {"erro": "Apostas encerradas: o jogo ja comecou."}
+        ), 422
 
     try:
         g1 = int(dados.get("gols_time1"))
@@ -418,7 +433,7 @@ def ranking():
     )
     for pos, item in enumerate(saida, start=1):
         item["posicao"] = pos
-    
+
     return resposta_sem_cache(saida)
 
 
@@ -453,10 +468,9 @@ def solicitar_reset():
     user = User.query.filter_by(email=email).first()
     if not user:
         # Nao revela se email existe ou nao (seguranca)
-        return resposta_sem_cache({
-            "ok": True, 
-            "msg": "Se o email existe, recebera um link de reset."
-        }), 200
+        return resposta_sem_cache(
+            {"ok": True, "msg": "Se o email existe, recebera um link de reset."}
+        ), 200
 
     # Token válido por 1 hora
     reset_token = create_access_token(
@@ -466,10 +480,9 @@ def solicitar_reset():
     # https://seu-app.com/resetar-senha?token=TOKEN
     print(f"[DEBUG] Reset token para {email}: {reset_token}")
 
-    return resposta_sem_cache({
-        "ok": True, 
-        "msg": "Link de reset enviado (verifique o terminal para teste)."
-    }), 200
+    return resposta_sem_cache(
+        {"ok": True, "msg": "Link de reset enviado (verifique o terminal para teste)."}
+    ), 200
 
 
 @app.post("/api/auth/resetar-senha")
@@ -484,7 +497,9 @@ def resetar_senha():
     nova_senha = dados.get("nova_senha") or ""
 
     if len(nova_senha) < 4:
-        return resposta_sem_cache({"erro": "A senha precisa de pelo menos 4 caracteres."}), 400
+        return resposta_sem_cache(
+            {"erro": "A senha precisa de pelo menos 4 caracteres."}
+        ), 400
 
     user = User.query.get(user_id)
     user.set_senha(nova_senha)
@@ -504,15 +519,11 @@ def sync_resultados():
     sucesso = sincronizar_resultados(app=app, verbose=True, status_filter=None)
 
     if sucesso:
-        return resposta_sem_cache({
-            "ok": True, 
-            "msg": "Resultados sincronizados com sucesso!"
-        }), 200
+        return resposta_sem_cache(
+            {"ok": True, "msg": "Resultados sincronizados com sucesso!"}
+        ), 200
     else:
-        return resposta_sem_cache({
-            "ok": False, 
-            "erro": "Falha ao sincronizar"
-        }), 500
+        return resposta_sem_cache({"ok": False, "erro": "Falha ao sincronizar"}), 500
 
 
 @app.post("/api/auth/atualizar-perfil")
@@ -533,10 +544,15 @@ def atualizar_perfil():
     user.nome = nome
     db.session.commit()
 
-    return resposta_sem_cache({
-        "ok": True, 
-        "user": {"id": user.id, "nome": user.nome, "email": user.email}
-    }), 200
+    return resposta_sem_cache(
+        {"ok": True, "user": {"id": user.id, "nome": user.nome, "email": user.email}}
+    ), 200
+
+
+@app.get("/health")
+def health():
+    """Endpoint para manter service acordado"""
+    return {"status": "ok", "timestamp": datetime.now().isoformat()}, 200
 
 
 if __name__ == "__main__":
