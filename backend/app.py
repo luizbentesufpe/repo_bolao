@@ -16,9 +16,11 @@ Rodar:
     flask --app app run --debug   # http://localhost:5000
 """
 
+import json  # ✅ ADICIONADO (necessário para json.dumps)
 import os
 from datetime import datetime, timedelta
 
+from apscheduler.schedulers.background import BackgroundScheduler
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 from flask_jwt_extended import (
@@ -28,6 +30,7 @@ from flask_jwt_extended import (
     jwt_required,
 )
 from models import Aposta, Jogo, User, db
+from pywebpush import WebPushException, webpush
 from sync_knockout import seed_knockout_matches
 
 app = Flask(__name__)
@@ -45,7 +48,6 @@ app.config["JWT_ACCESS_TOKEN_EXPIRES"] = timedelta(days=7)
 
 ultimo_sync_timestamp = None
 
-
 db.init_app(app)
 jwt = JWTManager(app)
 CORS(
@@ -56,6 +58,7 @@ CORS(
                 "https://bolao-web-0s5h.onrender.com",
                 "https://repo-bolao-1.onrender.com",
                 "https://pwa-test-m02z.onrender.com",
+                "http://localhost:4200",
             ],
             "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
             "allow_headers": ["Content-Type", "Authorization"],
@@ -395,7 +398,7 @@ def ranking():
         item = tabela.setdefault(
             aposta.user_id,
             {
-                "email": aposta.user.email,  # ✅ ADICIONADO: email para comparação
+                "email": aposta.user.email,
                 "nome": aposta.user.nome,
                 "pontos": 0,
                 "exatos": 0,
@@ -556,5 +559,209 @@ def health():
     return {"status": "ok", "timestamp": datetime.now().isoformat()}, 200
 
 
+@app.post("/api/notifications/subscribe")
+@jwt_required()
+def subscribe_notifications():
+    """
+    ✅ Cliente envia sua subscription do Service Worker
+    O servidor armazena para enviar push depois
+    """
+    from models import NotificationSubscription
+
+    user_id = int(get_jwt_identity())
+    dados = request.get_json(silent=True) or {}
+
+    endpoint = dados.get("endpoint")
+    auth = dados.get("keys", {}).get("auth")
+    p256dh = dados.get("keys", {}).get("p256dh")
+
+    if not endpoint or not auth or not p256dh:
+        return resposta_sem_cache({"erro": "Dados de subscription incompletos."}), 400
+
+    # Verifica se já existe
+    sub = NotificationSubscription.query.filter_by(endpoint=endpoint).first()
+    if sub:
+        sub.user_id = user_id
+        sub.auth = auth
+        sub.p256dh = p256dh
+    else:
+        sub = NotificationSubscription(
+            user_id=user_id, endpoint=endpoint, auth=auth, p256dh=p256dh
+        )
+        db.session.add(sub)
+
+    db.session.commit()
+
+    return resposta_sem_cache(
+        {"ok": True, "msg": "Subscription registrada com sucesso!"}
+    ), 201
+
+
+@app.delete("/api/notifications/unsubscribe")
+@jwt_required()
+def unsubscribe_notifications():
+    """
+    ✅ Remove subscription quando usuário desativa notificações
+    """
+    from models import NotificationSubscription
+
+    user_id = int(get_jwt_identity())
+    dados = request.get_json(silent=True) or {}
+    endpoint = dados.get("endpoint")
+
+    if not endpoint:
+        return resposta_sem_cache({"erro": "Endpoint não fornecido."}), 400
+
+    sub = NotificationSubscription.query.filter_by(
+        user_id=user_id, endpoint=endpoint
+    ).first()
+
+    if sub:
+        db.session.delete(sub)
+        db.session.commit()
+
+    return resposta_sem_cache({"ok": True, "msg": "Unsubscribed"}), 200
+
+
+# ================================================================ FUNÇÕES DE PUSH
+
+
+def enviar_push(subscription, titulo, mensagem, opcoes=None):
+    """
+    ✅ Envia push notification para um usuário
+    """
+    vapid_public_key = os.getenv("VAPID_PUBLIC_KEY")
+    vapid_private_key = os.getenv("VAPID_PRIVATE_KEY")
+    vapid_claims = {"sub": "mailto:seu-email@example.com"}
+
+    payload = {
+        "title": titulo,
+        "body": mensagem,
+        "icon": "/assets/icon-192.png",
+        "badge": "/assets/icon-192.png",
+        "tag": opcoes.get("tag", "notificacao") if opcoes else "notificacao",
+        "requireInteraction": opcoes.get("requireInteraction", False)
+        if opcoes
+        else False,
+        **(opcoes or {}),
+    }
+
+    try:
+        webpush(
+            subscription={
+                "endpoint": subscription.endpoint,
+                "keys": {"auth": subscription.auth, "p256dh": subscription.p256dh},
+            },
+            data=json.dumps(payload),
+            vapid_public_key=vapid_public_key,
+            vapid_private_key=vapid_private_key,
+            vapid_claims=vapid_claims,
+        )
+        return True
+    except WebPushException as e:
+        print(f"❌ Erro ao enviar push: {e}")
+        # Remover subscription inválida
+        if subscription:
+            db.session.delete(subscription)
+            db.session.commit()
+        return False
+
+
+def enviar_push_para_todos(titulo, mensagem, opcoes=None):
+    """
+    ✅ Envia push para todos os usuários inscritos
+    """
+    from models import NotificationSubscription
+
+    subscriptions = NotificationSubscription.query.all()
+    enviadas = 0
+
+    for sub in subscriptions:
+        if enviar_push(sub, titulo, mensagem, opcoes):
+            enviadas += 1
+
+    print(f"✅ Push enviado para {enviadas}/{len(subscriptions)} usuários")
+    return enviadas
+
+
+# ================================================================ SCHEDULER PARA ENVIAR LEMBRETES
+
+
+def verificar_jogos_proximos():
+    """
+    ✅ Função que executa a cada 5 minutos para verificar jogos próximos
+    ✅ Usa app context para acessar banco de dados
+    """
+    from models import Jogo, NotificationSubscription
+
+    with app.app_context():  # ✅ CORRIGIDO: app context para acessar DB
+        agora = datetime.now()
+        jogos = Jogo.query.all()
+
+        for jogo in jogos:
+            if jogo.comecou or jogo.encerrado:
+                continue
+
+            minutos_faltando = (jogo.data_hora - agora).total_seconds() / 60
+
+            # ✅ 30 minutos antes
+            if 29 <= minutos_faltando <= 31:
+                titulo = "⚽ Faltam 30 minutos!"
+                mensagem = (
+                    f"{jogo.time1.nome} × {jogo.time2.nome}\nFaça seu palpite agora!"
+                )
+
+                subs = NotificationSubscription.query.all()
+                for sub in subs:
+                    enviar_push(
+                        sub,
+                        titulo,
+                        mensagem,
+                        {"tag": f"jogo-{jogo.id}-30min", "requireInteraction": True},
+                    )
+
+            # ✅ 10 minutos antes
+            if 9 <= minutos_faltando <= 11:
+                titulo = "⚽ Faltam 10 minutos!"
+                mensagem = (
+                    f"{jogo.time1.nome} × {jogo.time2.nome}\nFaça seu palpite agora!"
+                )
+
+                subs = NotificationSubscription.query.all()
+                for sub in subs:
+                    enviar_push(
+                        sub,
+                        titulo,
+                        mensagem,
+                        {"tag": f"jogo-{jogo.id}-10min", "requireInteraction": True},
+                    )
+
+
+def iniciar_scheduler(app):
+    """
+    ✅ Inicia o scheduler de background
+    """
+    scheduler = BackgroundScheduler()
+
+    # Executa a cada 5 minutos
+    scheduler.add_job(
+        func=verificar_jogos_proximos,  # ✅ CORRIGIDO: sem lambda
+        trigger="interval",
+        minutes=5,
+        id="check_upcoming_games",
+        name="Verificar jogos próximos",
+        replace_existing=True,
+    )
+
+    scheduler.start()
+    print("✅ Scheduler iniciado - Verificando jogos a cada 5 minutos")
+
+
+# ✅ CORRIGIDO: Criar tabelas e iniciar scheduler corretamente
 if __name__ == "__main__":
+    with app.app_context():
+        db.create_all()
+        print("✅ Banco de dados criado/verificado")
+
+    iniciar_scheduler(app)
     app.run(debug=True)
