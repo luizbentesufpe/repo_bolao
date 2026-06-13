@@ -162,11 +162,11 @@ export class RankingComponent implements OnInit {
 
   // ✅ Método para calcular pé frio de forma consistente
   peFreioCount(item: RankingItem): number {
-    // ✅ CORRETO: Usa apenas apostas em jogos concluídos
-    return (item.apostas_em_jogos_concluidos ?? 0) 
-          - (item.apostas_pontuadas_em_jogos_concluidos ?? 0);
+    const falhas = this.jogoConcluido - item.apostas_pontuadas;
+    const maxPontos = Math.max(...this.itens.map(i => i.pontos));
+    const diferencaPontos = maxPontos - item.pontos;
+    return (falhas * 10) + diferencaPontos;
   }
-
   // ✅ NOVO: Abre modal com jogos em que pontuou
   abrirJogos(item: RankingItem) {
     this.participanteComFoco = item;
