@@ -102,12 +102,11 @@ class Jogo(db.Model):
     def em_breve(self):
         """Jogo não começou ainda"""
         return self.status_api in ["TIMED"]
-    
+
     @property
     def ao_vivo(self):
         """Jogo está em andamento"""
         return self.status_api in ["LIVE", "IN_PLAY", "PAUSED", "SUSPENDED"]
-
 
     @property
     def encerrado(self):
@@ -127,12 +126,12 @@ class Jogo(db.Model):
             "campeonato": self.campeonato.to_dict(),
             "time1": self.time1.to_dict(),
             "time2": self.time2.to_dict(),
-            "data_hora": self.data_hora.isoformat() + "Z",
+            "data_hora": self.data_hora.isoformat(),
             "gols_time1": self.gols_time1,
             "gols_time2": self.gols_time2,
             "estadio": self.estadio,
             "cidade_estado": self.cidade_estado,
-            "status_api": self.status_api,      # ✅ ADICIONAR ESTA LINHA
+            "status_api": self.status_api,  # ✅ ADICIONAR ESTA LINHA
             "em_breve": self.em_breve,
             "ao_vivo": self.ao_vivo,
             "encerrado": self.encerrado,
