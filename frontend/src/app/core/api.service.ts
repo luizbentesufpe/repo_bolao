@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Aposta, ApostasDoJogo, Jogo, RankingItem } from './models';
-import { environment } from '../../environment/environment';
+import { environment } from '../../environment/environment.prod';
 import { Observable } from 'rxjs';
 
 const API = `${environment.apiUrl}/api`;

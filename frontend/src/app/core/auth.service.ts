@@ -2,7 +2,7 @@ import { Injectable, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { tap } from 'rxjs';
 import { Usuario } from './models';
-import { environment } from '../../environment/environment';
+import { environment } from '../../environment/environment.prod';
 
 const API = `${environment.apiUrl}/api`;
 
