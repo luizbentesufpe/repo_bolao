@@ -12,6 +12,12 @@ import { AdminPlacaresComponent } from './pages/admin_placar.component';
 
 
 export const routes: Routes = [
+  { 
+    path: '', 
+    canActivate: [authGuard],
+    redirectTo: 'jogos',
+    pathMatch: 'full'
+  },
   { path: 'entrar', component: AuthComponent },
   { path: 'resetar-senha', component: ResetSenhaComponent },
   { path: 'jogos', component: JogosComponent, canActivate: [authGuard] },
