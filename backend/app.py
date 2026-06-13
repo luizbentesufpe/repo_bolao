@@ -93,6 +93,8 @@ def criar_usuario_padrao():
         db.session.add(novo)
         db.session.commit()
         print("✅ Usuário padrão criado: teste@render.com / 123456")
+    else:
+        print("✅ Usuário padrão já existe")
 
 
 # ✅ FUNÇÃO PARA CALCULAR PONTOS
