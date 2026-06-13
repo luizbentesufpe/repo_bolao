@@ -1,26 +1,22 @@
 # -*- coding: utf-8 -*-
 """
 API do Bolao da Copa 2026 (Flask).
-
 🚀 OTIMIZAÇÃO FINAL: 2 ENDPOINTS SEPARADOS
 1. GET /api/jogos → Dados do banco (< 500ms, SEM cache)
 2. POST /api/sincronizar → Sincroniza com API (background, COM cache 5 min)
-
 ✅ CACHE CORRETO:
 - Dados do BANCO: Sem cache (sempre fresco)
 - Chamadas EXTERNAS (API football-data): Com cache 5 min
-
 Rodar:
     pip install -r requirements.txt
     python seed.py        # cria o banco e popula os 72 jogos da fase de grupos
     flask --app app run --debug   # http://localhost:5000
 """
 
-import json  # ✅ ADICIONADO (necessário para json.dumps)
+import json
 import os
 from datetime import datetime, timedelta
 
-from apscheduler.schedulers.background import BackgroundScheduler
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 from flask_jwt_extended import (
@@ -82,19 +78,6 @@ def resposta_sem_cache(data):
     response.headers["Pragma"] = "no-cache"
     response.headers["Expires"] = "0"
     return response
-
-
-def criar_usuario_padrao():
-    """Cria usuário de teste se não existir"""
-    user = User.query.filter_by(email="teste@render.com").first()
-    if not user:
-        novo = User(nome="Teste Render", email="teste@render.com")
-        novo.set_senha("123456")
-        db.session.add(novo)
-        db.session.commit()
-        print("✅ Usuário padrão criado: teste@render.com / 123456")
-    else:
-        print("✅ Usuário padrão já existe")
 
 
 # ✅ FUNÇÃO PARA CALCULAR PONTOS
@@ -244,8 +227,6 @@ def listar_jogos():
     Cache: ❌ SEM cache (dados sempre frescos)
     """
     query = Jogo.query.order_by(Jogo.data_hora)
-    user_id = get_jwt_identity()
-    print(f"🔴 DEBUG: user_id = {user_id} (tipo: {type(user_id)})")
     user_id = get_jwt_identity()
     minhas = {}
     if user_id:
@@ -573,6 +554,7 @@ def health():
     return {"status": "ok", "timestamp": datetime.now().isoformat()}, 200
 
 
+# ================================================================ NOTIFICAÇÕES - ENDPOINTS
 @app.get("/api/notifications/status")
 @jwt_required()
 def notificacoes_status():
@@ -585,22 +567,6 @@ def notificacoes_status():
     )
 
     return resposta_sem_cache({"ativadas": tem_subscription, "user_id": user_id}), 200
-
-
-@app.post("/api/notifications/unsubscribe")
-@jwt_required()
-def desinscrever_notificacoes():
-    """Remove subscription de notificações do banco"""
-    from models import NotificationSubscription
-
-    user_id = int(get_jwt_identity())
-    subscription = NotificationSubscription.query.filter_by(user_id=user_id).delete()
-
-    db.session.commit()
-
-    return resposta_sem_cache(
-        {"ok": True, "msg": "Desincrito com sucesso", "removidas": subscription}
-    ), 200
 
 
 @app.post("/api/notifications/subscribe")
@@ -673,8 +639,6 @@ def unsubscribe_notifications():
 
 
 # ================================================================ FUNÇÕES DE PUSH
-
-
 def enviar_push(subscription, titulo, mensagem, opcoes=None):
     """
     ✅ Envia push notification para um usuário
@@ -716,26 +680,7 @@ def enviar_push(subscription, titulo, mensagem, opcoes=None):
         return False
 
 
-def enviar_push_para_todos(titulo, mensagem, opcoes=None):
-    """
-    ✅ Envia push para todos os usuários inscritos
-    """
-    from models import NotificationSubscription
-
-    subscriptions = NotificationSubscription.query.all()
-    enviadas = 0
-
-    for sub in subscriptions:
-        if enviar_push(sub, titulo, mensagem, opcoes):
-            enviadas += 1
-
-    print(f"✅ Push enviado para {enviadas}/{len(subscriptions)} usuários")
-    return enviadas
-
-
 # ================================================================ ENDPOINTS DE TESTE
-
-
 @app.post("/api/test-notification")
 @jwt_required()
 def test_notification():
@@ -768,25 +713,11 @@ def test_notification():
 def test_notification_all():
     """
     ✅ Envia notificação de teste para TODOS os usuários inscritos
-
-    ⚠️ APENAS PARA TESTE/DEBUG - remova em produção ou proteja com permissões
-
-    Retorna:
-    {
-        "ok": true,
-        "msg": "Notificação de teste enviada para todos",
-        "enviadas": 5,
-        "total": 5
-    }
+    ⚠️ APENAS PARA TESTE/DEBUG
     """
     from models import NotificationSubscription
 
     user_id = int(get_jwt_identity())
-
-    # ✅ Opcional: só permitir admin
-    # user = User.query.get(user_id)
-    # if user.email != 'luizfrancisco2000@gmail.com':
-    #     return resposta_sem_cache({"erro": "Apenas admin pode usar este endpoint"}), 403
 
     subs = NotificationSubscription.query.all()
 
@@ -816,86 +747,5 @@ def test_notification_all():
     ), 200
 
 
-# ================================================================ SCHEDULER PARA ENVIAR LEMBRETES
-
-
-def verificar_jogos_proximos():
-    """
-    ✅ Função que executa a cada 5 minutos para verificar jogos próximos
-    ✅ Usa app context para acessar banco de dados
-    """
-    from models import Jogo, NotificationSubscription
-
-    with app.app_context():  # ✅ CORRIGIDO: app context para acessar DB
-        agora = datetime.now()
-        jogos = Jogo.query.all()
-
-        for jogo in jogos:
-            if jogo.comecou or jogo.encerrado:
-                continue
-
-            minutos_faltando = (jogo.data_hora - agora).total_seconds() / 60
-
-            # ✅ 30 minutos antes
-            if 29 <= minutos_faltando <= 31:
-                titulo = "⚽ Faltam 30 minutos!"
-                mensagem = (
-                    f"{jogo.time1.nome} × {jogo.time2.nome}\nFaça seu palpite agora!"
-                )
-
-                subs = NotificationSubscription.query.all()
-                for sub in subs:
-                    enviar_push(
-                        sub,
-                        titulo,
-                        mensagem,
-                        {"tag": f"jogo-{jogo.id}-30min", "requireInteraction": True},
-                    )
-
-            # ✅ 10 minutos antes
-            if 9 <= minutos_faltando <= 11:
-                titulo = "⚽ Faltam 10 minutos!"
-                mensagem = (
-                    f"{jogo.time1.nome} × {jogo.time2.nome}\nFaça seu palpite agora!"
-                )
-
-                subs = NotificationSubscription.query.all()
-                for sub in subs:
-                    enviar_push(
-                        sub,
-                        titulo,
-                        mensagem,
-                        {"tag": f"jogo-{jogo.id}-10min", "requireInteraction": True},
-                    )
-
-
-def iniciar_scheduler(app):
-    """
-    ✅ Inicia o scheduler de background
-    """
-    scheduler = BackgroundScheduler()
-
-    # Executa a cada 5 minutos
-    scheduler.add_job(
-        func=verificar_jogos_proximos,  # ✅ CORRIGIDO: sem lambda
-        trigger="interval",
-        minutes=5,
-        id="check_upcoming_games",
-        name="Verificar jogos próximos",
-        replace_existing=True,
-    )
-
-    scheduler.start()
-    print("✅ Scheduler iniciado - Verificando jogos a cada 5 minutos")
-
-
-# ✅ CORRIGIDO: Criar tabelas e iniciar scheduler corretamente
 if __name__ == "__main__":
-    with app.app_context():
-        db.create_all()
-        criar_usuario_padrao()
-
-        print("✅ Banco de dados criado/verificado")
-
-    iniciar_scheduler(app)
     app.run(debug=True)
