@@ -56,7 +56,7 @@
                 }
               ],
               "outputHashing": "all",
-              "serviceWorker": "ngsw-config.json"
+              "serviceWorker": true
             },
             "test": {
               "fileReplacements": [
@@ -78,7 +78,7 @@
                 }
               ],
               "outputHashing": "all",
-              "serviceWorker": "ngsw-config.json"
+              "serviceWorker": true   
             },
             "development": {
               "buildOptimizer": false,
