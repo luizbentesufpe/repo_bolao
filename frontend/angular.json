@@ -55,6 +55,20 @@
                 }
               ]
             },
+            "test": {
+              "fileReplacements": [
+                {
+                  "replace": "src/environment/environment.ts",
+                  "with": "src/environment/environment.test.ts"
+                }
+              ],
+              "optimization": true,
+              "outputHashing": "all",
+              "sourceMap": false,
+              "namedChunks": false,
+              "aot": true,
+              "extractLicenses": true
+            },
             "development": {
               "buildOptimizer": false,
               "optimization": false,
