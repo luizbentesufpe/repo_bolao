@@ -1,5 +1,5 @@
 import { Injectable } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { environment } from '../../environment/environment';
 
 @Injectable({ providedIn: 'root' })
@@ -12,35 +12,29 @@ export class NotificationPermissionService {
    * ✅ Solicita permissão de notificações + sincroniza com banco
    */
   async solicitarPermissao(): Promise<NotificationPermission> {
-    // ✅ Verificar se browser suporta
     if (!('Notification' in window)) {
       console.warn('⚠️ Browser não suporta Notifications');
       return 'denied';
     }
 
-    // ✅ Se já foi negado, não pedir novamente
     if (Notification.permission === 'denied') {
       console.log('⚠️ Notificações bloqueadas pelo usuário');
-      await this.unsubscribe(); // Remover do banco se tiver
+      await this.unsubscribe();
       return 'denied';
     }
 
-    // ✅ Se já foi concedido, registrar subscription
     if (Notification.permission === 'granted') {
       console.log('✅ Notificações já habilitadas');
       await this.registrarSubscription();
       return 'granted';
     }
 
-    // ✅ Solicitar permissão (default = 'default')
     const permissao = await Notification.requestPermission();
     this.marcarComoPerguntado();
 
-    // ✅ Se concedido, registrar subscription
     if (permissao === 'granted') {
       await this.registrarSubscription();
     } else if (permissao === 'denied') {
-      // ✅ Se negado, remover do banco
       await this.unsubscribe();
     }
 
@@ -60,19 +54,16 @@ export class NotificationPermissionService {
 
       console.log(`📊 Navegador: ${permissaoNavegador} | Banco: ${temNoBank ? '✅' : '❌'}`);
 
-      // ❌ CENÁRIO 2: Navegador granted mas banco SEM subscription
       if (permissaoNavegador === 'granted' && !temNoBank) {
         console.log('⚠️ [SINCRONIZAÇÃO] Resubscrevendo no banco...');
         await this.registrarSubscription();
       }
 
-      // ❌ CENÁRIO 3: Navegador denied mas banco TEM subscription
       if (permissaoNavegador === 'denied' && temNoBank) {
         console.log('⚠️ [SINCRONIZAÇÃO] Removendo subscription do banco...');
         await this.unsubscribe();
       }
 
-      // ✅ CENÁRIO 1 e 4: Sincronizados
       console.log('✅ Notificações sincronizadas');
 
     } catch (e) {
@@ -82,17 +73,20 @@ export class NotificationPermissionService {
 
   /**
    * ✅ Verifica status NO BANCO
+   * FIX: Envia Authorization header com JWT token
    */
   statusNotificacoes() {
+    const token = localStorage.getItem('bolao_token');
     return this.http.get<{ ativadas: boolean }>(
-      `${environment.apiUrl}/api/notifications/status`
+      `${environment.apiUrl}/api/notifications/status`,
+      { headers: new HttpHeaders({ Authorization: `Bearer ${token}` }) }
     );
   }
 
   /**
    * ✅ Verifica status REAL (navegador + banco)
    */
-  async verificarStatusReal(): Promise<{navegador: NotificationPermission | 'unavailable', banco: boolean}> {
+  async verificarStatusReal(): Promise<{ navegador: NotificationPermission | 'unavailable', banco: boolean }> {
     const navegador = this.getPermissao();
     let banco = false;
 
@@ -108,6 +102,7 @@ export class NotificationPermissionService {
 
   /**
    * ✅ Registra subscription do Service Worker no backend
+   * FIX: Converte ArrayBuffer → base64url string antes de enviar
    */
   private async registrarSubscription(): Promise<void> {
     if (!('serviceWorker' in navigator)) {
@@ -124,7 +119,18 @@ export class NotificationPermissionService {
         ) as BufferSource
       });
 
-      // ✅ Enviar para backend
+      // ✅ FIX: getKey() retorna ArrayBuffer — converter para base64url string
+      const authBuffer = subscription.getKey('auth');
+      const p256dhBuffer = subscription.getKey('p256dh');
+
+      if (!authBuffer || !p256dhBuffer) {
+        console.error('❌ Chaves de subscription inválidas (nulas)');
+        return;
+      }
+
+      const auth = this.arrayBufferToBase64(authBuffer);
+      const p256dh = this.arrayBufferToBase64(p256dhBuffer);
+
       const token = localStorage.getItem('bolao_token');
       const response = await fetch(`${environment.apiUrl}/api/notifications/subscribe`, {
         method: 'POST',
@@ -132,17 +138,14 @@ export class NotificationPermissionService {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({
-          endpoint: subscription.endpoint,
-          auth: subscription.getKey('auth'),
-          p256dh: subscription.getKey('p256dh')
-        })
+        body: JSON.stringify({ endpoint: subscription.endpoint, auth, p256dh })
       });
 
       if (response.ok) {
         console.log('✅ Subscription registrada no backend!');
       } else {
-        console.error('❌ Erro ao registrar no backend:', response.statusText);
+        const erro = await response.text();
+        console.error('❌ Erro ao registrar no backend:', response.status, erro);
       }
     } catch (err) {
       console.error('❌ Erro ao registrar subscription:', err);
@@ -154,7 +157,6 @@ export class NotificationPermissionService {
    */
   async unsubscribe(): Promise<void> {
     try {
-      // 1️⃣ Remover DO BANCO
       const token = localStorage.getItem('bolao_token');
       if (!token) {
         console.warn('⚠️ Sem token para desinscrever');
@@ -173,7 +175,6 @@ export class NotificationPermissionService {
         console.error('❌ Erro ao desinscrever do banco:', response.statusText);
       }
 
-      // 2️⃣ Unsubscribe do navegador
       if ('serviceWorker' in navigator) {
         const reg = await navigator.serviceWorker.ready;
         const subscription = await reg.pushManager.getSubscription();
@@ -213,7 +214,20 @@ export class NotificationPermissionService {
   }
 
   /**
-   * ✅ Converte VAPID key para Uint8Array
+   * ✅ Converte ArrayBuffer → base64url string
+   * Necessário para serializar as chaves da PushSubscription
+   */
+  private arrayBufferToBase64(buffer: ArrayBuffer): string {
+    const bytes = new Uint8Array(buffer);
+    let binary = '';
+    for (let i = 0; i < bytes.byteLength; i++) {
+      binary += String.fromCharCode(bytes[i]);
+    }
+    return btoa(binary);
+  }
+
+  /**
+   * ✅ Converte VAPID key de base64url para Uint8Array
    */
   private urlBase64ToUint8Array(base64String: string): Uint8Array {
     const padding = '='.repeat((4 - base64String.length % 4) % 4);
