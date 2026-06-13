@@ -2,6 +2,7 @@ import { Component } from '@angular/core';
 import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { AuthService } from './core/auth.service';
+import { GameReminderService } from './core/game-reminder.service';
 
 @Component({
   selector: 'app-root',
@@ -66,7 +67,7 @@ import { AuthService } from './core/auth.service';
   `]
 })
 export class AppComponent {
-  constructor(public auth: AuthService, private router: Router) {}
+  constructor(public auth: AuthService, private router: Router, private gameReminder: GameReminderService) {}
 
   sair() {
     if (confirm('Tem certeza que deseja sair?')) {

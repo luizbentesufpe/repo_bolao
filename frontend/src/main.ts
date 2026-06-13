@@ -1,43 +1,42 @@
 import 'zone.js';
 import { bootstrapApplication } from '@angular/platform-browser';
 import { provideHttpClient, withInterceptors } from '@angular/common/http';
+import { provideRouter } from '@angular/router';
+import { environment } from './environment/environment';
 import { AppComponent } from './app/app.component';
+import { routes } from './app/app.routes';
 
-// ✅ REGISTRAR SERVICE WORKER PARA PWA
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/service-worker.js')
-      .then(reg => {
-        console.log('✅ Service Worker registrado:', reg.scope);
-        
-        // ✅ Ouve mensagens do Service Worker
-        navigator.serviceWorker.addEventListener('message', (event) => {
-          if (event.data.type === 'JOGOS_UPDATED') {
-            console.log('📦 Jogos atualizados pelo SW');
-            window.dispatchEvent(new CustomEvent('jogos-atualizados', {
+if ('serviceWorker' in navigator && environment.production) {
+  window.addEventListener('load', async () => {
+    try {
+      const registration = await navigator.serviceWorker.register(
+        '/service-worker.js'
+      );
+
+      console.log('✅ Service Worker registrado');
+      console.log('Scope:', registration.scope);
+
+      navigator.serviceWorker.addEventListener('message', (event) => {
+        if (event.data?.type === 'JOGOS_UPDATED') {
+          window.dispatchEvent(
+            new CustomEvent('jogos-atualizados', {
               detail: event.data.dados
-            }));
-          }
-        });
-
-        // ✅ Notificar quando SW for atualizado
-        reg.addEventListener('updatefound', () => {
-          const newWorker = reg.installing;
-          newWorker?.addEventListener('statechange', () => {
-            if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-              console.log('🔄 Nova versão do app disponível');
-            }
-          });
-        });
-      })
-      .catch(err => {
-        console.warn('⚠️ Erro ao registrar SW:', err);
+            })
+          );
+        }
       });
+
+    } catch (err) {
+      console.error('❌ Erro ao registrar SW', err);
+    }
   });
+}else{
+  console.log('⚠️ Service Worker desabilitado (desenvolvimento)');
 }
 
 bootstrapApplication(AppComponent, {
   providers: [
-    provideHttpClient(withInterceptors([]))
+    provideHttpClient(withInterceptors([])),
+    provideRouter(routes)
   ]
-}).catch(err => console.error('❌ Erro ao bootstrapear:', err));
+}).catch(err => console.error(err));

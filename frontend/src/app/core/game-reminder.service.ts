@@ -1,4 +1,4 @@
-import { Injectable, OnInit } from '@angular/core';
+import { Injectable } from '@angular/core';
 import { interval, Subscription } from 'rxjs';
 import { ApiService } from './api.service';
 import { NotificationService } from './notification.service';
@@ -10,10 +10,10 @@ import { NotificationService } from './notification.service';
 @Injectable({
   providedIn: 'root'
 })
-export class GameReminderService implements OnInit {
-
+export class GameReminderService {
   private checkInterval: Subscription | null = null;
   private notifiedGames = new Map<number, Set<number>>(); // jogo_id → [30, 10]
+  private isRunning = false; // ✅ Guard para evitar duplicatas
 
   constructor(
     private api: ApiService,
@@ -22,14 +22,16 @@ export class GameReminderService implements OnInit {
     this.startChecking();
   }
 
-  ngOnInit() {
-    this.startChecking();
-  }
-
   /**
-   * ✅ Inicia verificação a cada minuto
+   * ✅ Inicia verificação a cada minuto (apenas 1x)
    */
   private startChecking() {
+    // ✅ EVITA DUPLICATAS
+    if (this.isRunning) return;
+    this.isRunning = true;
+
+    console.log('⏰ GameReminderService iniciado');
+
     // Verificar a cada 1 minuto
     this.checkInterval = interval(60 * 1000).subscribe(() => {
       this.checkUpcomingGames();
@@ -84,8 +86,8 @@ export class GameReminderService implements OnInit {
    * ✅ Envia notificação de lembrete
    */
   private enviarNotificacao(jogo: any, minutos: number) {
-    const titulo = minutos === 30 
-      ? '⚽ Faltam 30 minutos!' 
+    const titulo = minutos === 30
+      ? '⚽ Faltam 30 minutos!'
       : '⚽ Faltam 10 minutos!';
 
     const mensagem = `${jogo.time1.nome} × ${jogo.time2.nome}`;
@@ -95,7 +97,7 @@ export class GameReminderService implements OnInit {
       tag: `jogo-${jogo.id}`,
       icon: '/assets/icon-192.png',
       badge: '/assets/icon-192.png',
-      requireInteraction: true // Fica visível até clicar
+      requireInteraction: true
     });
 
     console.log(`⏰ Lembrete enviado: ${titulo} - ${mensagem}`);
@@ -107,6 +109,8 @@ export class GameReminderService implements OnInit {
   stop() {
     if (this.checkInterval) {
       this.checkInterval.unsubscribe();
+      this.isRunning = false;
+      console.log('🛑 GameReminderService parado');
     }
   }
 
@@ -116,5 +120,6 @@ export class GameReminderService implements OnInit {
   reset() {
     this.notifiedGames.clear();
     this.stop();
+    console.log('🧹 GameReminderService resetado');
   }
 }
