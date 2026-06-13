@@ -3,8 +3,7 @@
   "version": "1.0.0",
   "scripts": {
     "start": "ng serve",
-    "build": "ng build && npm run copy-404",
-    "copy-404": "cp frontend/dist/bolao/browser/index.html frontend/dist/bolao/browser/404.html"
+    "build": "ng build"
   },
   "private": true,
 "dependencies": {
