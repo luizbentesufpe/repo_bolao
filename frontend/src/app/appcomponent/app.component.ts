@@ -6,13 +6,12 @@ import { GameReminderService } from '../core/game-reminder.service';
 import { NotificationPermissionService } from '../core/notification.permission.service';
 import { DeviceService } from '../core/device.service';
 
-
 @Component({
   selector: 'app-root',
   standalone: true,
   imports: [RouterOutlet, RouterLink, RouterLinkActive, CommonModule],
-  template: './app.component.html',
-  styles: './app.component.scss'
+  templateUrl: './app.component.html',
+  styleUrls: ['./app.component.scss']
 })
 export class AppComponent implements OnInit, OnDestroy {
   menuAberto = signal(false);
