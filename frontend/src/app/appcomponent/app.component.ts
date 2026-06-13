@@ -12,7 +12,7 @@ import { DeviceService } from '../core/device.service';
   standalone: true,
   imports: [RouterOutlet, RouterLink, RouterLinkActive, CommonModule],
   template: './app.component.html',
-  styles: ['./app.component.scss']
+  styles: './app.component.scss'
 })
 export class AppComponent implements OnInit, OnDestroy {
   menuAberto = signal(false);
