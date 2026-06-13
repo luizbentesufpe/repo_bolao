@@ -33,13 +33,23 @@ export class AppComponent implements OnInit, OnDestroy {
         console.error('❌ Erro ao sincronizar:', e);
       });
 
-      setTimeout(() => {
-        this.verificarNotificacoesDessincronizadas();
-      }, 1000);
+      // ✅ Verificar notificações dessincronizadas (apenas 1x por sessão)
+      const jaVerificou = sessionStorage.getItem('verificou_notif_dessincronizadas');
+      if (!jaVerificou) {
+        setTimeout(() => {
+          this.verificarNotificacoesDessincronizadas();
+          sessionStorage.setItem('verificou_notif_dessincronizadas', 'true');
+        }, 1000);
+      }
 
-      setTimeout(() => {
-        this.verificarModalPWA();
-      }, 2000);
+      // ✅ Verificar modal PWA (apenas 1x por sessão)
+      const jaVerificouPWA = sessionStorage.getItem('verificou_modal_pwa');
+      if (!jaVerificouPWA) {
+        setTimeout(() => {
+          this.verificarModalPWA();
+          sessionStorage.setItem('verificou_modal_pwa', 'true');
+        }, 2000);
+      }
     }
   }
 
@@ -91,29 +101,42 @@ export class AppComponent implements OnInit, OnDestroy {
   }
 
   /**
-   * ✅ Verifica notificações dessincronizadas
+   * ✅ Verifica notificações dessincronizadas (UMA VEZ por sessão)
    */
   async verificarNotificacoesDessincronizadas() {
     try {
       const status = await this.notifPermission.verificarStatusReal();
 
+      // ✅ Se tudo está OK: ativado no navegador E no banco → NÃO mostra modal
+      if (status.navegador === 'granted' && status.banco) {
+        console.log('✅ Notificações já estão completamente ativadas e sincronizadas');
+        return;
+      }
+
+      // ⚠️ Caso 1: Ativa no navegador mas não no banco
       if (status.navegador === 'granted' && !status.banco) {
         console.log('⚠️ Notificação ativa no navegador mas não no banco!');
         this.mostrarModalNotif = true;
         return;
       }
 
+      // ⚠️ Caso 2: No banco mas negada no navegador
       if (status.navegador === 'denied' && status.banco) {
         console.log('⚠️ Notificação no banco mas negada no navegador!');
         this.mostrarModalNotifNegada = true;
         return;
       }
 
-      if (this.auth.logado && !this.notifPermission.foiPerguntado()) {
-        setTimeout(() => {
-          this.mostrarModalNotif = true;
-          console.log('📬 Modal de notificações exibido');
-        }, 2000);
+      // ⚠️ Caso 3: Nunca perguntou ao usuário (navegador default/unknown)
+      if (
+        this.auth.logado &&
+        !this.notifPermission.foiPerguntado() &&
+        status.navegador !== 'granted' &&
+        status.navegador !== 'denied'
+      ) {
+        this.mostrarModalNotif = true;
+        console.log('📬 Modal de notificações exibido (primeira vez)');
+        return;
       }
 
       console.log('✅ Notificações sincronizadas');
@@ -126,9 +149,13 @@ export class AppComponent implements OnInit, OnDestroy {
     this.gameReminder.stop();
   }
 
+  /**
+   * ✅ Ativar notificações
+   */
   ativarNotif() {
     this.notifPermission.solicitarPermissao().then(permissao => {
       this.mostrarModalNotif = false;
+
       if (permissao === 'granted') {
         console.log('✅ Notificações ativadas!');
         this.notifPermission.testarNotificacao();
@@ -144,22 +171,34 @@ export class AppComponent implements OnInit, OnDestroy {
     });
   }
 
+  /**
+   * ✅ Tentar novamente
+   */
   tentarNovamente() {
     console.log('🔄 Tentando solicitar permissão novamente...');
     this.ativarNotif();
   }
 
+  /**
+   * ✅ Fechar modal de notificações negadas
+   */
   fecharModalNegada() {
     this.mostrarModalNotifNegada = false;
     this.notifPermission.marcarComoPerguntado();
   }
 
+  /**
+   * ✅ Recusar notificações por enquanto
+   */
   recusarNotif() {
     this.notifPermission.marcarComoPerguntado();
     this.mostrarModalNotif = false;
     console.log('⏭️ Usuário recusou notificações por enquanto');
   }
 
+  /**
+   * ✅ Sair (desktop)
+   */
   sair() {
     if (confirm('Tem certeza que deseja sair?')) {
       this.gameReminder.reset();
@@ -168,6 +207,9 @@ export class AppComponent implements OnInit, OnDestroy {
     }
   }
 
+  /**
+   * ✅ Sair (mobile)
+   */
   sairMobile() {
     this.fecharMenu();
     this.sair();
