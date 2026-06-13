@@ -244,7 +244,8 @@ def listar_jogos():
     Cache: ❌ SEM cache (dados sempre frescos)
     """
     query = Jogo.query.order_by(Jogo.data_hora)
-
+    user_id = get_jwt_identity()
+    print(f"🔴 DEBUG: user_id = {user_id} (tipo: {type(user_id)})")
     user_id = get_jwt_identity()
     minhas = {}
     if user_id:
@@ -591,19 +592,15 @@ def notificacoes_status():
 def desinscrever_notificacoes():
     """Remove subscription de notificações do banco"""
     from models import NotificationSubscription
-    
+
     user_id = int(get_jwt_identity())
-    subscription = NotificationSubscription.query.filter_by(
-        user_id=user_id
-    ).delete()
-    
+    subscription = NotificationSubscription.query.filter_by(user_id=user_id).delete()
+
     db.session.commit()
-    
-    return resposta_sem_cache({
-        "ok": True,
-        "msg": "Desincrito com sucesso",
-        "removidas": subscription
-    }), 200
+
+    return resposta_sem_cache(
+        {"ok": True, "msg": "Desincrito com sucesso", "removidas": subscription}
+    ), 200
 
 
 @app.post("/api/notifications/subscribe")
@@ -622,7 +619,7 @@ def subscribe_notifications():
     dados = request.get_json(silent=True) or {}
 
     endpoint = dados.get("endpoint")
-    
+
     # ✅ NOVO: Aceita ambos os formatos
     auth = dados.get("auth") or dados.get("keys", {}).get("auth")
     p256dh = dados.get("p256dh") or dados.get("keys", {}).get("p256dh")
@@ -676,6 +673,7 @@ def unsubscribe_notifications():
 
 
 # ================================================================ FUNÇÕES DE PUSH
+
 
 def enviar_push(subscription, titulo, mensagem, opcoes=None):
     """
@@ -737,6 +735,7 @@ def enviar_push_para_todos(titulo, mensagem, opcoes=None):
 
 # ================================================================ ENDPOINTS DE TESTE
 
+
 @app.post("/api/test-notification")
 @jwt_required()
 def test_notification():
@@ -769,9 +768,9 @@ def test_notification():
 def test_notification_all():
     """
     ✅ Envia notificação de teste para TODOS os usuários inscritos
-    
+
     ⚠️ APENAS PARA TESTE/DEBUG - remova em produção ou proteja com permissões
-    
+
     Retorna:
     {
         "ok": true,
@@ -781,39 +780,40 @@ def test_notification_all():
     }
     """
     from models import NotificationSubscription
-    
+
     user_id = int(get_jwt_identity())
-    
+
     # ✅ Opcional: só permitir admin
     # user = User.query.get(user_id)
     # if user.email != 'luizfrancisco2000@gmail.com':
     #     return resposta_sem_cache({"erro": "Apenas admin pode usar este endpoint"}), 403
-    
+
     subs = NotificationSubscription.query.all()
-    
+
     if not subs:
-        return resposta_sem_cache({
-            "ok": False, 
-            "msg": "Nenhuma subscription no banco"
-        }), 400
-    
+        return resposta_sem_cache(
+            {"ok": False, "msg": "Nenhuma subscription no banco"}
+        ), 400
+
     enviadas = 0
     for sub in subs:
         result = enviar_push(
             sub,
             "🧪 Notificação de Teste para Todos!",
             "Esta é uma notificação de teste enviada para todos os usuários.",
-            {"tag": "test-notification-all"}
+            {"tag": "test-notification-all"},
         )
         if result:
             enviadas += 1
-    
-    return resposta_sem_cache({
-        "ok": True,
-        "msg": "Notificação de teste enviada para todos",
-        "enviadas": enviadas,
-        "total": len(subs)
-    }), 200
+
+    return resposta_sem_cache(
+        {
+            "ok": True,
+            "msg": "Notificação de teste enviada para todos",
+            "enviadas": enviadas,
+            "total": len(subs),
+        }
+    ), 200
 
 
 # ================================================================ SCHEDULER PARA ENVIAR LEMBRETES
