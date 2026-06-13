@@ -52,7 +52,7 @@ CORS(
     app,
     resources={
         r"/api/*": {
-            "origins": ["https://bolao-web-0s5h.onrender.com"],
+            "origins": ["https://bolao-web-0s5h.onrender.com", "https://repo-bolao-1.onrender.com"],
             "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
             "allow_headers": ["Content-Type", "Authorization"],
         }
