@@ -8,17 +8,34 @@ export class NotificationPermissionService {
 
   constructor(private http: HttpClient) {}
 
+  /**
+   * ✅ Solicita permissão de notificações
+   */
   async solicitarPermissao(): Promise<NotificationPermission> {
-    if (!('Notification' in window)) return 'denied';
-    if (Notification.permission === 'denied') return 'denied';
+    // ✅ Verificar se browser suporta
+    if (!('Notification' in window)) {
+      console.warn('⚠️ Browser não suporta Notifications');
+      return 'denied';
+    }
+
+    // ✅ Se já foi negado, não pedir novamente
+    if (Notification.permission === 'denied') {
+      console.log('⚠️ Notificações bloqueadas pelo usuário');
+      return 'denied';
+    }
+
+    // ✅ Se já foi concedido, registrar subscription
     if (Notification.permission === 'granted') {
+      console.log('✅ Notificações já habilitadas');
       await this.registrarSubscription();
       return 'granted';
     }
 
+    // ✅ Solicitar permissão (default = 'default')
     const permissao = await Notification.requestPermission();
     this.marcarComoPerguntado();
 
+    // ✅ Se concedido, registrar subscription
     if (permissao === 'granted') {
       await this.registrarSubscription();
     }
@@ -30,32 +47,63 @@ export class NotificationPermissionService {
    * ✅ Registra subscription do Service Worker no backend
    */
   private async registrarSubscription(): Promise<void> {
-    if (!('serviceWorker' in navigator)) return;
+    if (!('serviceWorker' in navigator)) {
+      console.warn('⚠️ Service Worker não suportado');
+      return;
+    }
 
     try {
       const reg = await navigator.serviceWorker.ready;
       const subscription = await reg.pushManager.subscribe({
         userVisibleOnly: true,
-        // ✅ FIX: Fazer cast para BufferSource
         applicationServerKey: this.urlBase64ToUint8Array(
           environment.vapidPublicKey
         ) as BufferSource
       });
 
-      // Envia para o backend
+      // ✅ Enviar para backend
       const token = localStorage.getItem('bolao_token');
-      await fetch(`${environment.apiUrl}/api/notifications/subscribe`, {
+      const response = await fetch(`${environment.apiUrl}/api/notifications/subscribe`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify(subscription)
+        body: JSON.stringify({
+          endpoint: subscription.endpoint,
+          auth: subscription.getKey('auth'),
+          p256dh: subscription.getKey('p256dh')
+        })
       });
 
-      console.log('✅ Subscription registrada!');
+      if (response.ok) {
+        console.log('✅ Subscription registrada no backend!');
+      } else {
+        console.error('❌ Erro ao registrar no backend:', response.statusText);
+      }
     } catch (err) {
       console.error('❌ Erro ao registrar subscription:', err);
+    }
+  }
+
+  /**
+   * ✅ Envia notificação de teste
+   */
+  testarNotificacao(): void {
+    if (Notification.permission !== 'granted') {
+      console.warn('⚠️ Notificações não estão habilitadas');
+      return;
+    }
+
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.ready.then(reg => {
+        reg.showNotification('✅ Notificações Ativadas!', {
+          body: 'Você receberá lembretes de jogos próximos.',
+          icon: '/assets/icon-192.png',
+          badge: '/assets/icon-192.png',
+          tag: 'test-notification'
+        });
+      });
     }
   }
 
@@ -78,19 +126,41 @@ export class NotificationPermissionService {
     return outputArray;
   }
 
+  /**
+   * ✅ Verifica se notificações estão habilitadas
+   */
   estaPermitido(): boolean {
+    if (!('Notification' in window)) return false;
     return Notification.permission === 'granted';
   }
 
-  getPermissao(): NotificationPermission {
+  /**
+   * ✅ Retorna estado da permissão
+   */
+  getPermissao(): NotificationPermission | 'unavailable' {
+    if (!('Notification' in window)) return 'unavailable';
     return Notification.permission;
   }
 
-  jaPerguntou(): boolean {
+  /**
+   * ✅ Verifica se já foi perguntado ao usuário
+   */
+  foiPerguntado(): boolean {
     return localStorage.getItem(this.STORAGE_KEY) === 'true';
   }
 
+  /**
+   * ✅ Marca como já perguntado
+   */
   marcarComoPerguntado(): void {
     localStorage.setItem(this.STORAGE_KEY, 'true');
+  }
+
+  /**
+   * ✅ Reseta o estado de perguntado (para testar novamente)
+   */
+  resetarEstado(): void {
+    localStorage.removeItem(this.STORAGE_KEY);
+    console.log('🧹 Estado de notificações resetado');
   }
 }
