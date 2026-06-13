@@ -24,6 +24,8 @@ modules/.vscode
 .vimrc
 .nvimrc
 
+frontend/src/environments/environment.prod.ts
+
 # Don't check in secret files
 *secret.js
 
