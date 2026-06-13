@@ -702,7 +702,6 @@ def enviar_push(subscription, titulo, mensagem, opcoes=None):
                 "keys": {"auth": subscription.auth, "p256dh": subscription.p256dh},
             },
             data=json.dumps(payload),
-            vapid_public_key=vapid_public_key,
             vapid_private_key=vapid_private_key,
             vapid_claims=vapid_claims,
         )
