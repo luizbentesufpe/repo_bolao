@@ -572,6 +572,40 @@ def health():
     return {"status": "ok", "timestamp": datetime.now().isoformat()}, 200
 
 
+@app.get("/api/notifications/status")
+@jwt_required()
+def notificacoes_status():
+    """Verificar se usuário tem subscription de notificações no banco"""
+    from models import NotificationSubscription
+
+    user_id = int(get_jwt_identity())
+    tem_subscription = (
+        NotificationSubscription.query.filter_by(user_id=user_id).first() is not None
+    )
+
+    return resposta_sem_cache({"ativadas": tem_subscription, "user_id": user_id}), 200
+
+
+@app.post("/api/notifications/unsubscribe")
+@jwt_required()
+def desinscrever_notificacoes():
+    """Remove subscription de notificações do banco"""
+    from models import NotificationSubscription
+    
+    user_id = int(get_jwt_identity())
+    subscription = NotificationSubscription.query.filter_by(
+        user_id=user_id
+    ).delete()
+    
+    db.session.commit()
+    
+    return resposta_sem_cache({
+        "ok": True,
+        "msg": "Desincrito com sucesso",
+        "removidas": subscription
+    }), 200
+
+
 @app.post("/api/notifications/subscribe")
 @jwt_required()
 def subscribe_notifications():

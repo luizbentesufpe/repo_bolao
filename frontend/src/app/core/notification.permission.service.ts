@@ -9,7 +9,7 @@ export class NotificationPermissionService {
   constructor(private http: HttpClient) {}
 
   /**
-   * ✅ Solicita permissão de notificações
+   * ✅ Solicita permissão de notificações + sincroniza com banco
    */
   async solicitarPermissao(): Promise<NotificationPermission> {
     // ✅ Verificar se browser suporta
@@ -21,6 +21,7 @@ export class NotificationPermissionService {
     // ✅ Se já foi negado, não pedir novamente
     if (Notification.permission === 'denied') {
       console.log('⚠️ Notificações bloqueadas pelo usuário');
+      await this.unsubscribe(); // Remover do banco se tiver
       return 'denied';
     }
 
@@ -38,9 +39,71 @@ export class NotificationPermissionService {
     // ✅ Se concedido, registrar subscription
     if (permissao === 'granted') {
       await this.registrarSubscription();
+    } else if (permissao === 'denied') {
+      // ✅ Se negado, remover do banco
+      await this.unsubscribe();
     }
 
     return permissao;
+  }
+
+  /**
+   * ✅ Sincroniza permissão do navegador com banco
+   * Chamado no primeiro acesso (app.component.ts ngOnInit)
+   */
+  async sincronizarNotificacoes(): Promise<void> {
+    const permissaoNavegador = this.getPermissao();
+
+    try {
+      const statusBanco = await this.statusNotificacoes().toPromise();
+      const temNoBank = statusBanco?.ativadas || false;
+
+      console.log(`📊 Navegador: ${permissaoNavegador} | Banco: ${temNoBank ? '✅' : '❌'}`);
+
+      // ❌ CENÁRIO 2: Navegador granted mas banco SEM subscription
+      if (permissaoNavegador === 'granted' && !temNoBank) {
+        console.log('⚠️ [SINCRONIZAÇÃO] Resubscrevendo no banco...');
+        await this.registrarSubscription();
+      }
+
+      // ❌ CENÁRIO 3: Navegador denied mas banco TEM subscription
+      if (permissaoNavegador === 'denied' && temNoBank) {
+        console.log('⚠️ [SINCRONIZAÇÃO] Removendo subscription do banco...');
+        await this.unsubscribe();
+      }
+
+      // ✅ CENÁRIO 1 e 4: Sincronizados
+      console.log('✅ Notificações sincronizadas');
+
+    } catch (e) {
+      console.error('❌ Erro ao sincronizar notificações:', e);
+    }
+  }
+
+  /**
+   * ✅ Verifica status NO BANCO
+   */
+  statusNotificacoes() {
+    return this.http.get<{ ativadas: boolean }>(
+      `${environment.apiUrl}/api/notifications/status`
+    );
+  }
+
+  /**
+   * ✅ Verifica status REAL (navegador + banco)
+   */
+  async verificarStatusReal(): Promise<{navegador: NotificationPermission | 'unavailable', banco: boolean}> {
+    const navegador = this.getPermissao();
+    let banco = false;
+
+    try {
+      const status = await this.statusNotificacoes().toPromise();
+      banco = status?.ativadas || false;
+    } catch (e) {
+      console.warn('⚠️ Erro ao verificar banco:', e);
+    }
+
+    return { navegador, banco };
   }
 
   /**
@@ -87,6 +150,48 @@ export class NotificationPermissionService {
   }
 
   /**
+   * ✅ Desinscreve do banco + navegador
+   */
+  async unsubscribe(): Promise<void> {
+    try {
+      // 1️⃣ Remover DO BANCO
+      const token = localStorage.getItem('bolao_token');
+      if (!token) {
+        console.warn('⚠️ Sem token para desinscrever');
+        return;
+      }
+
+      const response = await fetch(`${environment.apiUrl}/api/notifications/unsubscribe`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (!response.ok) {
+        console.error('❌ Erro ao desinscrever do banco:', response.statusText);
+      }
+
+      // 2️⃣ Unsubscribe do navegador
+      if ('serviceWorker' in navigator) {
+        const reg = await navigator.serviceWorker.ready;
+        const subscription = await reg.pushManager.getSubscription();
+
+        if (subscription) {
+          await subscription.unsubscribe();
+          console.log('✅ Desincrito do navegador');
+        }
+      }
+
+      console.log('✅ Desincrito do banco e navegador');
+
+    } catch (e) {
+      console.error('❌ Erro ao desinscrever:', e);
+    }
+  }
+
+  /**
    * ✅ Envia notificação de teste
    */
   testarNotificacao(): void {
@@ -127,7 +232,7 @@ export class NotificationPermissionService {
   }
 
   /**
-   * ✅ Verifica se notificações estão habilitadas
+   * ✅ Verifica se notificações estão habilitadas (navegador)
    */
   estaPermitido(): boolean {
     if (!('Notification' in window)) return false;
@@ -135,7 +240,7 @@ export class NotificationPermissionService {
   }
 
   /**
-   * ✅ Retorna estado da permissão
+   * ✅ Retorna estado da permissão (navegador)
    */
   getPermissao(): NotificationPermission | 'unavailable' {
     if (!('Notification' in window)) return 'unavailable';

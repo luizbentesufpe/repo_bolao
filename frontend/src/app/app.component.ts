@@ -100,6 +100,13 @@ export class AppComponent implements OnInit, OnDestroy {
   ) {}
 
   ngOnInit() {
+    // ✅ SINCRONIZAR notificações (navegador + banco)
+    if (this.auth.logado) {
+      this.notifPermission.sincronizarNotificacoes().catch(e => {
+        console.error('❌ Erro ao sincronizar:', e);
+      });
+    }
+
     // ✅ Mostrar modal se usuário logou e não foi perguntado ainda
     if (this.auth.logado && !this.notifPermission.foiPerguntado()) {
       setTimeout(() => {
@@ -120,6 +127,8 @@ export class AppComponent implements OnInit, OnDestroy {
       if (permissao === 'granted') {
         console.log('✅ Notificações ativadas!');
         this.notifPermission.testarNotificacao();
+        // ✅ Sincronizar após ativar
+        this.notifPermission.sincronizarNotificacoes();
       } else {
         console.log('⚠️ Notificações bloqueadas pelo usuário');
       }
