@@ -33,7 +33,7 @@ export class BandeiraPipe implements PipeTransform {
     
     // Grupo E
     'Alemanha': 'Alemanha.png',
-    'Curaçao': 'Curaçao.png',
+    'Curaçau': 'Curaçau.png',
     'Costa do Marfim': 'Costa_do_Marfim.png',
     'Equador': 'Equador.png',
     
