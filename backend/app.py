@@ -142,16 +142,16 @@ def verificar_jogos_proximos():
             jogo_30min = Jogo.query.filter(
                 Jogo.data_hora > agora + timedelta(minutes=25),
                 Jogo.data_hora < agora + timedelta(minutes=35),
-                Jogo.encerrado == False,
-                Jogo.comecou == False,
+                Jogo.status_api == "TIMED",
+                Jogo.gols_time1.is_(None), 
             ).first()
             
             # Jogos que começam em ~10 minutos
             jogo_10min = Jogo.query.filter(
                 Jogo.data_hora > agora + timedelta(minutes=5),
                 Jogo.data_hora < agora + timedelta(minutes=15),
-                Jogo.encerrado == False,
-                Jogo.comecou == False,
+                Jogo.status_api == "TIMED",
+                Jogo.gols_time1.is_(None), 
             ).first()
             
             # Obter todas as subscriptions
@@ -856,10 +856,7 @@ def scheduler_test_simulate():
             time2_id=time2.id,
             data_hora=data_jogo_30min,
             estadio="🧪 SIMULADO",
-            comecou=False,
-            encerrado=False,
-            gols_time1=None,
-            gols_time2=None
+            status_api="TIMED" 
         )
         db.session.add(jogo_fake)
         db.session.commit()
