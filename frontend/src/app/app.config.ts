@@ -5,22 +5,9 @@ import { registerLocaleData } from '@angular/common';
 import localePt from '@angular/common/locales/pt';
 import { routes } from './app.routes';
 import { authInterceptor } from './core/auth.interceptor';
-
+import { initHealth } from '../health';
 
 registerLocaleData(localePt);
-
-// ✅ HEALTH CHECK
-function initHealth(http: HttpClient) {
-  return () => {
-    // Chamar /api/health a cada 90 segundos para manter app acordado
-    setInterval(() => {
-      http.get('https://test-backend-k1u1.onrender.com/api/health').subscribe(
-        () => console.log('✅ Health check'),
-        () => console.log('Health check falhou')
-      );
-    }, 90000);
-  };
-}
 
 export const appConfig: ApplicationConfig = {
   providers: [
@@ -30,7 +17,7 @@ export const appConfig: ApplicationConfig = {
     {
       provide: APP_INITIALIZER,
       useFactory: initHealth,
-      deps: [HttpClient],
+      deps: [],
       multi: true
     }
   ],
