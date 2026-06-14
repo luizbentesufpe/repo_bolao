@@ -29,7 +29,7 @@ import { SincronizacaoService } from '../core/sincronizacao.service';
       @for (dia of dias; track dia.chave) {
         <!-- JOGOS ATIVOS -->
         @if (dia.jogosAtivos.length > 0) {
-          <div class="dia-grupo"><span class="rotulo">{{ dia.data | date:'EEEE, d \\'de\\' MMMM' }}</span></div>
+          <div class="dia-grupo"><span class="rotulo">{{ dia.data | date:'EEEE, d MMMM' }}</span></div>
           @for (jogo of dia.jogosAtivos; track jogo.id) {
             <article class="jogo-card">
               <div class="jogo-time">
@@ -153,7 +153,7 @@ import { SincronizacaoService } from '../core/sincronizacao.service';
                     </div>
 
                     <div class="jogo-meta">
-                      <span style="font-size: 12px; color: #999;">{{ jogo.data_hora | date:'HH:mm' }}</span>
+                      <span style="font-size: 12px; color: #999;"><p>{{ jogo.data_hora | date: 'EEEE, d MMM' }}</p></span>
 
                       @if (jogo.minha_aposta && jogo.minha_aposta.gols_time1 !== null && jogo.minha_aposta.gols_time2 !== null) { 
                         <span class="pontos-chip" [class.cheio]="jogo.minha_aposta.pontos > 0">

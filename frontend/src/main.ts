@@ -1,22 +1,17 @@
 import 'zone.js';
 import { bootstrapApplication } from '@angular/platform-browser';
-import { provideHttpClient, withInterceptors } from '@angular/common/http';
-import { provideRouter } from '@angular/router';
 import { environment } from './environment/environment';
-import { routes } from './app/app.routes';
 import { AppComponent } from './app/appcomponent/app.component';
-import { authInterceptor } from './app/core/auth.interceptor';
+import { appConfig } from './app/app.config';
 
+// ✅ Registrar Service Worker apenas em production
 if ('serviceWorker' in navigator && environment.production) {
   window.addEventListener('load', async () => {
     try {
-      const registration = await navigator.serviceWorker.register(
-        '/service-worker.js'
-      );
-
+      const registration = await navigator.serviceWorker.register('/service-worker.js');
       console.log('✅ Service Worker registrado');
       console.log('Scope:', registration.scope);
-
+      
       navigator.serviceWorker.addEventListener('message', (event) => {
         if (event.data?.type === 'JOGOS_UPDATED') {
           window.dispatchEvent(
@@ -26,18 +21,13 @@ if ('serviceWorker' in navigator && environment.production) {
           );
         }
       });
-
     } catch (err) {
       console.error('❌ Erro ao registrar SW', err);
     }
   });
-}else{
+} else {
   console.log('⚠️ Service Worker desabilitado (desenvolvimento)');
 }
 
-bootstrapApplication(AppComponent, {
-  providers: [
-    provideHttpClient(withInterceptors([authInterceptor])),
-    provideRouter(routes)
-  ]
-}).catch(err => console.error(err));
+// ✅ Bootstrap com appConfig (já contém todos os providers)
+bootstrapApplication(AppComponent, appConfig).catch(err => console.error(err));

@@ -1,9 +1,10 @@
 # -*- coding: utf-8 -*-
 """
-API do Bolao da Copa 2026 (Flask).
-🚀 OTIMIZAÇÃO FINAL: 2 ENDPOINTS SEPARADOS
+API do Bolao da Copa 2026 (Flask com APScheduler).
+🚀 FINAL: 2 ENDPOINTS SEPARADOS + SCHEDULER AUTOMÁTICO
 1. GET /api/jogos → Dados do banco (< 500ms, SEM cache)
 2. POST /api/sincronizar → Sincroniza com API (background, COM cache 5 min)
+3. SCHEDULER → Notificações automáticas 30min e 10min antes dos jogos
 ✅ CACHE CORRETO:
 - Dados do BANCO: Sem cache (sempre fresco)
 - Chamadas EXTERNAS (API football-data): Com cache 5 min
@@ -25,7 +26,8 @@ from flask_jwt_extended import (
     get_jwt_identity,
     jwt_required,
 )
-from models import Aposta, Jogo, User, db
+from apscheduler.schedulers.background import BackgroundScheduler
+from models import Aposta, Jogo, User, db, NotificationSubscription
 from pywebpush import WebPushException, webpush
 from sync_knockout import seed_knockout_matches
 
@@ -62,6 +64,9 @@ CORS(
     },
 )
 
+# ✅ SCHEDULER PARA NOTIFICAÇÕES AUTOMÁTICAS
+scheduler = BackgroundScheduler()
+
 # ✅ Cache para sincronização on-demand
 ultimo_sync = None
 INTERVALO_SYNC = 5  # minutos
@@ -78,6 +83,103 @@ def resposta_sem_cache(data):
     response.headers["Pragma"] = "no-cache"
     response.headers["Expires"] = "0"
     return response
+
+
+# ✅ FUNÇÃO PARA ENVIAR NOTIFICAÇÕES (PUSH)
+def enviar_push(subscription, titulo, mensagem, opcoes=None):
+    """
+    ✅ Envia push notification para um usuário
+    """
+    vapid_private_key = os.getenv("VAPID_PRIVATE_KEY")
+    frontend_url = os.getenv("FRONTEND_URL", "")
+    vapid_claims = {"sub": "mailto:seu-email@example.com"}
+    
+    payload = {
+        "title": titulo,
+        "body": mensagem,
+        "icon": f"{frontend_url}/assets/icon-192.png",
+        "badge": f"{frontend_url}/assets/icon-192.png",
+        "tag": opcoes.get("tag", "notificacao") if opcoes else "notificacao",
+        "requireInteraction": opcoes.get("requireInteraction", False) if opcoes else False,
+        **(opcoes or {}),
+    }
+
+    try:
+        webpush(
+            subscription_info={
+                "endpoint": subscription.endpoint,
+                "keys": {"auth": subscription.auth, "p256dh": subscription.p256dh},
+            },
+            data=json.dumps(payload),
+            vapid_private_key=vapid_private_key,
+            vapid_claims=vapid_claims,
+        )
+        return True
+    except WebPushException as e:
+        print(f"❌ Erro ao enviar push: {e}")
+        try:
+            db.session.delete(subscription)
+            db.session.commit()
+        except:
+            pass
+        return False
+
+
+# ✅ FUNÇÃO DO SCHEDULER - VERIFICA JOGOS PRÓXIMOS
+def verificar_jogos_proximos():
+    """
+    ⏰ Verifica jogos que começam em 30 min e 10 min
+    Envia notificações para usuários inscritos
+    Roda a cada 5 minutos em background
+    """
+    try:
+        print(f"[{datetime.now().strftime('%H:%M:%S')}] 🔔 Verificando jogos próximos...")
+        
+        with app.app_context():
+            agora = datetime.now()
+            
+            # Jogos que começam em ~30 minutos
+            jogo_30min = Jogo.query.filter(
+                Jogo.data_hora > agora + timedelta(minutes=25),
+                Jogo.data_hora < agora + timedelta(minutes=35),
+                Jogo.encerrado == False,
+                Jogo.comecou == False,
+            ).first()
+            
+            # Jogos que começam em ~10 minutos
+            jogo_10min = Jogo.query.filter(
+                Jogo.data_hora > agora + timedelta(minutes=5),
+                Jogo.data_hora < agora + timedelta(minutes=15),
+                Jogo.encerrado == False,
+                Jogo.comecou == False,
+            ).first()
+            
+            # Obter todas as subscriptions
+            subs = NotificationSubscription.query.all()
+            
+            # Enviar notificações para jogo em 30 minutos
+            if jogo_30min and subs:
+                print(f"⏰ Enviando lembretes (30min): {jogo_30min.time1.nome} vs {jogo_30min.time2.nome}")
+                for sub in subs:
+                    enviar_push(
+                        sub,
+                        f"⏰ {jogo_30min.time1.nome} vs {jogo_30min.time2.nome}",
+                        "Faltam 30 minutos! Não esqueça sua aposta!",
+                        {"tag": "lembrete-30min", "requireInteraction": True}
+                    )
+            
+            # Enviar notificações para jogo em 10 minutos
+            if jogo_10min and subs:
+                print(f"⚽ Enviando lembretes (10min): {jogo_10min.time1.nome} vs {jogo_10min.time2.nome}")
+                for sub in subs:
+                    enviar_push(
+                        sub,
+                        f"⚽ {jogo_10min.time1.nome} vs {jogo_10min.time2.nome}",
+                        "COMEÇANDO EM 10 MINUTOS! Confira sua aposta!",
+                        {"tag": "lembrete-10min", "requireInteraction": True}
+                    )
+    except Exception as e:
+        print(f"❌ Erro ao verificar jogos próximos: {e}")
 
 
 # ✅ FUNÇÃO PARA CALCULAR PONTOS
@@ -121,7 +223,7 @@ def calcular_pontos(aposta, jogo):
     return 0
 
 
-# ========================================== FUNÇÃO PARA RECALCULAR PONTOS
+# ✅ FUNÇÃO PARA RECALCULAR PONTOS
 def recalcular_pontos_jogo(jogo):
     """Recalcula pontos quando jogo termina (status = FINISHED)"""
 
@@ -226,12 +328,6 @@ def listar_jogos():
     Tempo: < 500ms
     Cache: ❌ SEM cache (dados sempre frescos)
     """
-    # 🔍 DEBUG
-    from flask import request as flask_request
-    auth_header = flask_request.headers.get('Authorization')
-    user_id = get_jwt_identity()
-    print(f"🔍 Auth header: {auth_header}")
-    print(f"🔍 user_id decodificado: {user_id}")
     query = Jogo.query.order_by(Jogo.data_hora)
     user_id = get_jwt_identity()
     minhas = {}
@@ -565,8 +661,6 @@ def health():
 @jwt_required()
 def notificacoes_status():
     """Verificar se usuário tem subscription de notificações no banco"""
-    from models import NotificationSubscription
-
     user_id = int(get_jwt_identity())
     tem_subscription = (
         NotificationSubscription.query.filter_by(user_id=user_id).first() is not None
@@ -585,8 +679,6 @@ def subscribe_notifications():
     1. {endpoint, auth, p256dh}
     2. {endpoint, keys: {auth, p256dh}}
     """
-    from models import NotificationSubscription
-
     user_id = int(get_jwt_identity())
     dados = request.get_json(silent=True) or {}
 
@@ -624,8 +716,6 @@ def unsubscribe_notifications():
     """
     ✅ Remove subscription quando usuário desativa notificações
     """
-    from models import NotificationSubscription
-
     user_id = int(get_jwt_identity())
     dados = request.get_json(silent=True) or {}
     endpoint = dados.get("endpoint")
@@ -644,50 +734,11 @@ def unsubscribe_notifications():
     return resposta_sem_cache({"ok": True, "msg": "Unsubscribed"}), 200
 
 
-# ================================================================ FUNÇÕES DE PUSH
-def enviar_push(subscription, titulo, mensagem, opcoes=None):
-    """
-    ✅ Envia push notification para um usuário
-    """
-    vapid_private_key = os.getenv("VAPID_PRIVATE_KEY")
-    frontend_url = os.getenv("FRONTEND_URL", "")
-    vapid_claims = {"sub": "mailto:seu-email@example.com"}
-    
-    payload = {
-        "title": titulo,
-        "body": mensagem,
-        "icon": f"{frontend_url}/assets/icon-192.png",
-        "badge": f"{frontend_url}/assets/icon-192.png",
-        "tag": opcoes.get("tag", "notificacao") if opcoes else "notificacao",
-        "requireInteraction": opcoes.get("requireInteraction", False) if opcoes else False,
-        **(opcoes or {}),
-    }
-
-    try:
-        webpush(
-            subscription_info={
-                "endpoint": subscription.endpoint,
-                "keys": {"auth": subscription.auth, "p256dh": subscription.p256dh},
-            },
-            data=json.dumps(payload),
-            vapid_private_key=vapid_private_key,  # ✅ APENAS ISTO
-            vapid_claims=vapid_claims,
-        )
-        return True
-    except WebPushException as e:
-        print(f"❌ Erro ao enviar push: {e}")
-        if subscription:
-            db.session.delete(subscription)
-            db.session.commit()
-        return False
-
 # ================================================================ ENDPOINTS DE TESTE
 @app.post("/api/test-notification")
 @jwt_required()
 def test_notification():
     """Envia notificação de teste para todos"""
-    from models import NotificationSubscription
-
     subs = NotificationSubscription.query.all()
 
     if not subs:
@@ -716,8 +767,6 @@ def test_notification_all():
     ✅ Envia notificação de teste para TODOS os usuários inscritos
     ⚠️ APENAS PARA TESTE/DEBUG
     """
-    from models import NotificationSubscription
-
     user_id = int(get_jwt_identity())
 
     subs = NotificationSubscription.query.all()
@@ -748,5 +797,36 @@ def test_notification_all():
     ), 200
 
 
+# ================================================================ INICIAR SCHEDULER NA PRIMEIRA REQUISIÇÃO
+def init_scheduler():
+    """
+    ✅ Inicia o scheduler quando a primeira requisição chega
+    Não bloqueia o app, roda em background thread
+    """
+    try:
+        if not scheduler.running:
+            # Verifica jogos próximos a cada 5 minutos
+            scheduler.add_job(
+                verificar_jogos_proximos,
+                "interval",
+                minutes=5,
+                id="verificar_jogos",
+                replace_existing=True,
+            )
+            scheduler.start()
+            print("✅ [APScheduler] Iniciado! Verificando jogos a cada 5 min")
+    except Exception as e:
+        print(f"❌ Erro ao iniciar scheduler: {e}")
+
+
+@app.before_request
+def antes_requisicao():
+    """Inicializa scheduler na primeira requisição"""
+    init_scheduler()
+
+
 if __name__ == "__main__":
-    app.run(debug=True)
+    with app.app_context():
+        db.create_all()
+        init_scheduler()
+    app.run(debug=False, threaded=True)
