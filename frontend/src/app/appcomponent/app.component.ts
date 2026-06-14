@@ -33,7 +33,7 @@ export class AppComponent implements OnInit, OnDestroy {
     public device: DeviceService,
     public pwaService: PwaInstallService,
     private backButton: BackButtonService
-  ) {}
+  ) { }
 
   /**
    * ✅ Instalar PWA
@@ -49,13 +49,25 @@ export class AppComponent implements OnInit, OnDestroy {
         console.error('❌ Erro ao sincronizar:', e);
       });
 
-      // ✅ Verificar notificações dessincronizadas (apenas 1x por sessão)
-      const jaVerificou = sessionStorage.getItem('verificou_notif_dessincronizadas');
-      if (!jaVerificou) {
-        setTimeout(() => {
-          this.verificarNotificacoesDessincronizadas();
-          sessionStorage.setItem('verificou_notif_dessincronizadas', 'true');
-        }, 1000);
+      // ✅ NOTIFICAÇÕES: PWA pergunta 1x, Navegador pergunta por sessão
+      if (this.device.isPWAInstalled()) {
+        // PWA: usa localStorage (persiste entre sessões)
+        const jaVerificouPWA = localStorage.getItem('verificou_notif_pwa');
+        if (!jaVerificouPWA) {
+          setTimeout(() => {
+            this.verificarNotificacoesDessincronizadas();
+            localStorage.setItem('verificou_notif_pwa', 'true');
+          }, 1000);
+        }
+      } else {
+        // Navegador: usa sessionStorage (apenas por sessão)
+        const jaVerificou = sessionStorage.getItem('verificou_notif_dessincronizadas');
+        if (!jaVerificou) {
+          setTimeout(() => {
+            this.verificarNotificacoesDessincronizadas();
+            sessionStorage.setItem('verificou_notif_dessincronizadas', 'true');
+          }, 1000);
+        }
       }
 
       // ✅ Verificar modal PWA (apenas 1x por sessão)
