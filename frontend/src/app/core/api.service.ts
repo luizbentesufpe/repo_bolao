@@ -21,7 +21,9 @@ export class ApiService {
       gols_time2: g2
     });
   }
-
+  sincronizar() {
+    return this.http.post(`${API}/sincronizar`, {});
+  }
   apostasDoJogo(jogoId: number): Observable<ApostasDoJogo> {
     return this.http.get<ApostasDoJogo>(`${API}/apostas-do-jogo/${jogoId}`);
   }
