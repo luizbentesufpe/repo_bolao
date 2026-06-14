@@ -1,79 +1,79 @@
 @if (auth.logado) {
-      <header class="topo">
-        <div class="topo-inner">
-          <!-- ✅ HAMBURGER MENU (apenas mobile) -->
-          @if (device.isMobile()) {
-            <button class="hamburger" (click)="toggleMenu()" [class.ativo]="menuAberto()">
-              <span></span>
-              <span></span>
-              <span></span>
-            </button>
-          }
-
-          <div class="logo">BOLÃO <span>DA COPA 2026 - Familia</span></div>
-
-          <!-- ✅ NAV DESKTOP (apenas desktop) -->
-          @if (!device.isMobile()) {
-            <nav class="nav">
-              <a routerLink="/jogos" routerLinkActive="ativo">🎯 Jogos</a>
-              <a routerLink="/bolao" routerLinkActive="ativo">📊 Fazer bolão</a>
-              <a routerLink="/ranking" routerLinkActive="ativo">🏆 Mais acertos</a>
-              <a routerLink="/ranking-jogo" routerLinkActive="ativo">📈 Ranking/Jogo</a>
-              <a routerLink="/perfil" routerLinkActive="ativo">👤 Meu Perfil</a>
-              @if (auth.usuario()?.email === 'luizfrancisco2000@gmail.com') {
-                <a routerLink="/admin-placares" routerLinkActive="ativo" class="admin-link">
-                  ⚙️ Admin
-                </a>
-              }
-            </nav>
-          }
-
-          <div class="usuario">
-            <span>{{ auth.usuario()?.nome }}</span>
-            <button (click)="sair()" class="btn-sair">Sair</button>
-          </div>
-        </div>
-      </header>
-
-      <!-- ✅ MENU LATERAL (apenas mobile) -->
+  <header class="topo">
+    <div class="topo-inner">
+      <!-- ✅ HAMBURGER MENU (apenas mobile) -->
       @if (device.isMobile()) {
-        <div class="menu-overlay" [class.ativo]="menuAberto()" (click)="fecharMenu()"></div>
-        <nav class="menu-lateral" [class.ativo]="menuAberto()">
-          <button class="fechar-menu" (click)="fecharMenu()">✕</button>
-          
-          <div class="usuario-menu">
-            <div class="nome">{{ auth.usuario()?.nome }}</div>
-            <div class="email">{{ auth.usuario()?.email }}</div>
-          </div>
+        <button class="hamburger" (click)="toggleMenu()" [class.ativo]="menuAberto()">
+          <span></span>
+          <span></span>
+          <span></span>
+        </button>
+      }
 
-          <a routerLink="/jogos" routerLinkActive="ativo" (click)="fecharMenu()" class="menu-item">
-            🎯 Jogos
-          </a>
-          <a routerLink="/bolao" routerLinkActive="ativo" (click)="fecharMenu()" class="menu-item">
-            📊 Fazer bolão
-          </a>
-          <a routerLink="/ranking" routerLinkActive="ativo" (click)="fecharMenu()" class="menu-item">
-            🏆 Mais acertos
-          </a>
-          <a routerLink="/ranking-jogo" routerLinkActive="ativo" (click)="fecharMenu()" class="menu-item">
-            📈 Ranking/Jogo
-          </a>
-          <a routerLink="/perfil" routerLinkActive="ativo" (click)="fecharMenu()" class="menu-item">
-            👤 Meu Perfil
-          </a>
+      <div class="logo">BOLÃO <span>DA COPA 2026 - Familia</span></div>
 
+      <!-- ✅ NAV DESKTOP (apenas desktop) -->
+      @if (!device.isMobile()) {
+        <nav class="nav">
+          <a routerLink="/jogos" routerLinkActive="ativo">🎯 Jogos</a>
+          <a routerLink="/bolao" routerLinkActive="ativo">📊 Fazer bolão</a>
+          <a routerLink="/ranking" routerLinkActive="ativo">🏆 Mais acertos</a>
+          <a routerLink="/ranking-jogo" routerLinkActive="ativo">📈 Ranking/Jogo</a>
+          <a routerLink="/perfil" routerLinkActive="ativo">👤 Meu Perfil</a>
           @if (auth.usuario()?.email === 'luizfrancisco2000@gmail.com') {
-            <a routerLink="/admin-placares" routerLinkActive="ativo" (click)="fecharMenu()" class="menu-item admin-link">
+            <a routerLink="/admin-placares" routerLinkActive="ativo" class="admin-link">
               ⚙️ Admin
             </a>
           }
-
-          <button (click)="sairMobile()" class="menu-item btn-sair-mobile">
-            🚪 Sair
-          </button>
         </nav>
       }
-    }
+
+      <div class="usuario">
+        <span>{{ auth.usuario()?.nome }}</span>
+        <button (click)="sair()" class="btn-sair">Sair</button>
+      </div>
+    </div>
+  </header>
+
+  <!-- ✅ MENU LATERAL (apenas mobile) -->
+  @if (device.isMobile()) {
+    <div class="menu-overlay" [class.ativo]="menuAberto()" (click)="fecharMenu()"></div>
+    <nav class="menu-lateral" [class.ativo]="menuAberto()">
+      <button class="fechar-menu" (click)="fecharMenu()">✕</button>
+      
+      <div class="usuario-menu">
+        <div class="nome">{{ auth.usuario()?.nome }}</div>
+        <div class="email">{{ auth.usuario()?.email }}</div>
+      </div>
+
+      <a routerLink="/jogos" routerLinkActive="ativo" (click)="fecharMenu()" class="menu-item">
+        🎯 Jogos
+      </a>
+      <a routerLink="/bolao" routerLinkActive="ativo" (click)="fecharMenu()" class="menu-item">
+        📊 Fazer bolão
+      </a>
+      <a routerLink="/ranking" routerLinkActive="ativo" (click)="fecharMenu()" class="menu-item">
+        🏆 Mais acertos
+      </a>
+      <a routerLink="/ranking-jogo" routerLinkActive="ativo" (click)="fecharMenu()" class="menu-item">
+        📈 Ranking/Jogo
+      </a>
+      <a routerLink="/perfil" routerLinkActive="ativo" (click)="fecharMenu()" class="menu-item">
+        👤 Meu Perfil
+      </a>
+
+      @if (auth.usuario()?.email === 'luizfrancisco2000@gmail.com') {
+        <a routerLink="/admin-placares" routerLinkActive="ativo" (click)="fecharMenu()" class="menu-item admin-link">
+          ⚙️ Admin
+        </a>
+      }
+
+      <button (click)="sairMobile()" class="menu-item btn-sair-mobile">
+        🚪 Sair
+      </button>
+    </nav>
+  }
+}
 
 <!-- ✅ MODAL PWA (mobile) -->
 @if (mostrarModalPWA) {
@@ -100,69 +100,124 @@
     </div>
   </div>
 }
-    <!-- ✅ MODAL NOTIFICAÇÕES -->
-    @if (mostrarModalNotif) {
-      <div style="position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 1000;">
-        <div style="background: white; padding: 24px; border-radius: 12px; max-width: 400px; box-shadow: 0 20px 60px rgba(0,0,0,0.3); margin: 16px;">
-          <h2 style="font-size: 20px; font-weight: 700; margin-bottom: 12px; color: var(--tinta);">
-            🔔 Ativar Notificações?
-          </h2>
-          <p style="color: var(--tinta-fraca); margin-bottom: 20px; line-height: 1.6;">
-            Receba lembretes automáticos 30 minutos e 10 minutos antes de cada jogo para não perder seus palpites!
-          </p>
-          <div style="display: flex; gap: 12px;">
-            <button
-              (click)="recusarNotif()"
-              style="flex: 1; padding: 12px; background: #f0f0f0; border: none; border-radius: 6px; font-weight: 700; cursor: pointer; color: #666;">
-              Agora não
-            </button>
-            <button
-              (click)="ativarNotif()"
-              style="flex: 1; padding: 12px; background: var(--campo); color: white; border: none; border-radius: 6px; font-weight: 700; cursor: pointer;">
-              ✅ Ativar
-            </button>
-          </div>
-        </div>
+
+<!-- ✅ MODAL NOTIFICAÇÕES -->
+@if (mostrarModalNotif) {
+  <div style="position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 1000;">
+    <div style="background: white; padding: 24px; border-radius: 12px; max-width: 400px; box-shadow: 0 20px 60px rgba(0,0,0,0.3); margin: 16px;">
+      <h2 style="font-size: 20px; font-weight: 700; margin-bottom: 12px; color: var(--tinta);">
+        🔔 Ativar Notificações?
+      </h2>
+      <p style="color: var(--tinta-fraca); margin-bottom: 20px; line-height: 1.6;">
+        Receba lembretes automáticos 30 minutos e 10 minutos antes de cada jogo para não perder seus palpites!
+      </p>
+      <div style="display: flex; gap: 12px;">
+        <button
+          (click)="recusarNotif()"
+          style="flex: 1; padding: 12px; background: #f0f0f0; border: none; border-radius: 6px; font-weight: 700; cursor: pointer; color: #666;">
+          Agora não
+        </button>
+        <button
+          (click)="ativarNotif()"
+          style="flex: 1; padding: 12px; background: var(--campo); color: white; border: none; border-radius: 6px; font-weight: 700; cursor: pointer;">
+          ✅ Ativar
+        </button>
       </div>
-    }
+    </div>
+  </div>
+}
 
-    <!-- ✅ MODAL NOTIFICAÇÕES NEGADAS -->
-    @if (mostrarModalNotifNegada) {
-      <div style="position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 1000;">
-        <div style="background: white; padding: 24px; border-radius: 12px; max-width: 400px; box-shadow: 0 20px 60px rgba(0,0,0,0.3); margin: 16px;">
-          <h2 style="font-size: 20px; font-weight: 700; margin-bottom: 12px; color: var(--tinta);">
-            🔔 Ativar Notificações?
-          </h2>
-          <p style="color: var(--tinta-fraca); margin-bottom: 16px; line-height: 1.6;">
-            As notificações estão desativadas no seu navegador. Para ativá-las:
-          </p>
-          
-          <div style="background: #f5f5f5; padding: 12px; border-radius: 6px; margin-bottom: 16px; font-size: 14px; color: #666; line-height: 1.6;">
-            <strong>📱 No celular:</strong><br>
-            Abra as configurações do navegador → Permissões → Notificações → Ativar
-            <br><br>
-            <strong>💻 No computador:</strong><br>
-            Clique no ícone de cadeado/engrenagem na barra de endereço → Permissões → Notificações → Permitir
-          </div>
-
-          <p style="color: var(--tinta-fraca); margin-bottom: 20px; font-size: 14px;">
-            Depois volte aqui e clique em "Tentar Novamente"
-          </p>
-
-          <div style="display: flex; gap: 12px;">
-            <button
-              (click)="fecharModalNegada()"
-              style="flex: 1; padding: 12px; background: #f0f0f0; border: none; border-radius: 6px; font-weight: 700; cursor: pointer; color: #666;">
-              Depois
-            </button>
-            <button
-              (click)="tentarNovamente()"
-              style="flex: 1; padding: 12px; background: var(--campo); color: white; border: none; border-radius: 6px; font-weight: 700; cursor: pointer;">
-              🔄 Tentar Novamente
-            </button>
-          </div>
-        </div>
+<!-- ✅ MODAL NOTIFICAÇÕES NEGADAS -->
+@if (mostrarModalNotifNegada) {
+  <div style="position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 1000;">
+    <div style="background: white; padding: 24px; border-radius: 12px; max-width: 400px; box-shadow: 0 20px 60px rgba(0,0,0,0.3); margin: 16px;">
+      <h2 style="font-size: 20px; font-weight: 700; margin-bottom: 12px; color: var(--tinta);">
+        🔔 Ativar Notificações?
+      </h2>
+      <p style="color: var(--tinta-fraca); margin-bottom: 16px; line-height: 1.6;">
+        As notificações estão desativadas no seu navegador. Para ativá-las:
+      </p>
+      
+      <div style="background: #f5f5f5; padding: 12px; border-radius: 6px; margin-bottom: 16px; font-size: 14px; color: #666; line-height: 1.6;">
+        <strong>📱 No celular:</strong><br>
+        Abra as configurações do navegador → Permissões → Notificações → Ativar
+        <br><br>
+        <strong>💻 No computador:</strong><br>
+        Clique no ícone de cadeado/engrenagem na barra de endereço → Permissões → Notificações → Permitir
       </div>
-    }
 
-    <router-outlet />
+      <p style="color: var(--tinta-fraca); margin-bottom: 20px; font-size: 14px;">
+        Depois volte aqui e clique em "Tentar Novamente"
+      </p>
+
+      <div style="display: flex; gap: 12px;">
+        <button
+          (click)="fecharModalNegada()"
+          style="flex: 1; padding: 12px; background: #f0f0f0; border: none; border-radius: 6px; font-weight: 700; cursor: pointer; color: #666;">
+          Depois
+        </button>
+        <button
+          (click)="tentarNovamente()"
+          style="flex: 1; padding: 12px; background: var(--campo); color: white; border: none; border-radius: 6px; font-weight: 700; cursor: pointer;">
+          🔄 Tentar Novamente
+        </button>
+      </div>
+    </div>
+  </div>
+}
+
+<!-- ✅ MODAL FECHAR APP (double tap - MOBILE ONLY) -->
+@if (mostrarModalFecharApp) {
+  <div style="position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 1001;">
+    <div style="background: white; padding: 24px; border-radius: 12px; max-width: 300px; box-shadow: 0 20px 60px rgba(0,0,0,0.3); margin: 16px;">
+      <h2 style="font-size: 18px; font-weight: 700; margin-bottom: 16px; color: var(--tinta);">
+        👋 Fechar Bolão?
+      </h2>
+      <p style="color: var(--tinta-fraca); margin-bottom: 20px; line-height: 1.6;">
+        Você continuará logado. Pode abrir o app novamente quando quiser.
+      </p>
+      
+      <div style="display: flex; gap: 12px; flex-direction: column;">
+        <button
+          (click)="cancelarFecharApp()"
+          style="width: 100%; padding: 12px; background: #f0f0f0; border: none; border-radius: 6px; font-weight: 700; cursor: pointer; color: #666;">
+          Cancelar
+        </button>
+        <button
+          (click)="confirmarFecharApp()"
+          style="width: 100%; padding: 12px; background: var(--vermelho); color: white; border: none; border-radius: 6px; font-weight: 700; cursor: pointer;">
+          ✓ Fechar
+        </button>
+      </div>
+    </div>
+  </div>
+}
+
+<!-- ✅ MODAL SAIR (botão navbar - LOGOUT) -->
+@if (mostrarModalSair) {
+  <div style="position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 1001;">
+    <div style="background: white; padding: 24px; border-radius: 12px; max-width: 300px; box-shadow: 0 20px 60px rgba(0,0,0,0.3); margin: 16px;">
+      <h2 style="font-size: 18px; font-weight: 700; margin-bottom: 16px; color: var(--tinta);">
+        👋 Sair do Bolão?
+      </h2>
+      <p style="color: var(--tinta-fraca); margin-bottom: 20px; line-height: 1.6;">
+        Você será desconectado e precisará fazer login novamente.
+      </p>
+      
+      <div style="display: flex; gap: 12px; flex-direction: column;">
+        <button
+          (click)="cancelarSaida()"
+          style="width: 100%; padding: 12px; background: #f0f0f0; border: none; border-radius: 6px; font-weight: 700; cursor: pointer; color: #666;">
+          Cancelar
+        </button>
+        <button
+          (click)="confirmarSaida()"
+          style="width: 100%; padding: 12px; background: var(--vermelho); color: white; border: none; border-radius: 6px; font-weight: 700; cursor: pointer;">
+          ✓ Sair
+        </button>
+      </div>
+    </div>
+  </div>
+}
+
+<router-outlet />
