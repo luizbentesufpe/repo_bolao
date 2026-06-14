@@ -819,6 +819,109 @@ def init_scheduler():
         print(f"❌ Erro ao iniciar scheduler: {e}")
 
 
+# ================================================================ TESTE DO SCHEDULER
+@app.post("/api/scheduler/test-simulate")
+@jwt_required()
+def scheduler_test_simulate():
+    """
+    🧪 Simula um jogo começando em 30min para testar o scheduler
+    - Cria jogo fake
+    - Executa verificar_jogos_proximos()
+    - Deleta jogo fake
+    - Retorna resultado
+    """
+    try:
+        print("\n" + "="*60)
+        print("🧪 INICIANDO TESTE DO SCHEDULER")
+        print("="*60)
+        
+        from models import Time
+        
+        # Criar tempos fake se não existirem
+        time1 = Time.query.first()
+        time2 = Time.query.filter(Time.id != time1.id).first()
+        
+        if not time1 or not time2:
+            return resposta_sem_cache({
+                "ok": False,
+                "msg": "Erro: precisa ter pelo menos 2 times no banco"
+            }), 400
+        
+        # Criar jogo que começa em 30 minutos
+        agora = datetime.now()
+        data_jogo_30min = agora + timedelta(minutes=28)
+        
+        jogo_fake = Jogo(
+            time1_id=time1.id,
+            time2_id=time2.id,
+            data_hora=data_jogo_30min,
+            estadio="🧪 SIMULADO",
+            comecou=False,
+            encerrado=False,
+            gols_time1=None,
+            gols_time2=None
+        )
+        db.session.add(jogo_fake)
+        db.session.commit()
+        
+        print(f"✅ Jogo simulado criado: ID {jogo_fake.id}")
+        print(f"   Time 1: {time1.nome}")
+        print(f"   Time 2: {time2.nome}")
+        print(f"   Começa em: {jogo_fake.data_hora.strftime('%H:%M:%S')}")
+        print(f"   Diferença: 28 minutos (vai disparar notificação de 30min)")
+        
+        # Executar a função do scheduler manualmente
+        print("\n🔔 Executando verificar_jogos_proximos()...")
+        verificar_jogos_proximos()
+        
+        # Deletar jogo fake
+        db.session.delete(jogo_fake)
+        db.session.commit()
+        
+        print(f"✅ Jogo simulado deletado")
+        print("="*60)
+        
+        return resposta_sem_cache({
+            "ok": True,
+            "msg": "✅ Teste do scheduler executado com sucesso!",
+            "detalhes": {
+                "jogo_criado": f"{time1.nome} vs {time2.nome}",
+                "horario": data_jogo_30min.strftime('%H:%M:%S'),
+                "scheduler_status": "running" if scheduler.running else "stopped"
+            }
+        }), 200
+        
+    except Exception as e:
+        print(f"❌ Erro no teste: {e}")
+        import traceback
+        traceback.print_exc()
+        return resposta_sem_cache({
+            "ok": False,
+            "msg": f"Erro ao simular: {str(e)}"
+        }), 500
+
+
+@app.get("/api/scheduler/status")
+def scheduler_status():
+    """
+    🔍 Verificar status do APScheduler
+    """
+    jobs = scheduler.get_jobs()
+    
+    return resposta_sem_cache({
+        "ok": True,
+        "scheduler_running": scheduler.running,
+        "total_jobs": len(jobs),
+        "jobs": [
+            {
+                "id": job.id,
+                "name": job.name,
+                "trigger": str(job.trigger),
+                "next_run_time": job.next_run_time.isoformat() if job.next_run_time else None
+            }
+            for job in jobs
+        ]
+    }), 200
 @app.before_request
 def antes_requisicao():
     """Inicializa scheduler na primeira requisição"""
