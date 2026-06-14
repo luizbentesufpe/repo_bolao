@@ -331,13 +331,15 @@ interface JogoComPalpite extends Jogo {
     .jogo-header {
       display: flex;
       justify-content: space-between;
+      gap: 26px;
       align-items: center;
+      padding: 8px 0;
     }
 
     .jogo-time-mobile {
       display: flex;
       align-items: center;
-      gap: 8px;
+      gap: 12px;
       flex: 1;
       font-weight: 700;
       font-size: 14px;
@@ -352,7 +354,9 @@ interface JogoComPalpite extends Jogo {
     }
 
     .time-nome {
-      word-break: break-word;
+      word-break: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
 
     /* ✅ PALPITE CONTAINER */
@@ -599,7 +603,16 @@ interface JogoComPalpite extends Jogo {
       }
 
       .jogo-time-mobile {
-        font-size: 13px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        flex: 0 1 auto;  /* ← Mudado para não expandir demais */
+        font-weight: 700;
+        font-size: 12px;
+        color: var(--tinta);
+        white-space: nowrap;  /* ← Impede quebra de linha */
+        overflow: hidden;
+        text-overflow: ellipsis;  /* Adiciona "..." se ficar muito longo */
       }
 
       .bandeira {
