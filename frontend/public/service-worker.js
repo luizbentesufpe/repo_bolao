@@ -54,3 +54,54 @@ self.addEventListener('fetch', (event) => {
     })
   );
 });
+
+
+// ✅ HANDLER PARA NOTIFICAÇÕES PUSH
+self.addEventListener('push', (event) => {
+  console.log('🔔 [SW] Push recebido:', event);
+
+  if (!event.data) {
+    console.log('❌ [SW] Sem dados na notificação');
+    return;
+  }
+
+  try {
+    const dados = JSON.parse(event.data.text());
+    console.log('📨 [SW] Dados da notificação:', dados);
+
+    const opcoes = {
+      body: dados.body,
+      icon: dados.icon || '/assets/icon-192.png',
+      badge: dados.badge || '/assets/icon-192.png',
+      tag: dados.tag || 'notificacao',
+      requireInteraction: dados.requireInteraction || false,
+    };
+
+    event.waitUntil(
+      self.registration.showNotification(dados.title, opcoes)
+    );
+  } catch (e) {
+    console.error('❌ [SW] Erro ao processar push:', e);
+  }
+});
+
+// ✅ HANDLER PARA CLIQUE NA NOTIFICAÇÃO
+self.addEventListener('notificationclick', (event) => {
+  console.log('👆 [SW] Notificação clicada:', event.notification.tag);
+  event.notification.close();
+  
+  event.waitUntil(
+    clients.matchAll({ type: 'window' }).then((clientList) => {
+      // Se já tem aba aberta, foca nela
+      for (let client of clientList) {
+        if (client.url === '/' && 'focus' in client) {
+          return client.focus();
+        }
+      }
+      // Senão, abre nova aba
+      if (clients.openWindow) {
+        return clients.openWindow('/');
+      }
+    })
+  );
+});
