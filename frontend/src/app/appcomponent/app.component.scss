@@ -1,16 +1,18 @@
-/* ============================================ */
-/* APP COMPONENT STYLES - VERSÃO FINAL */
-/* ============================================ */
+/* ============================================================
+   app.component — estilos do shell da aplicação
+   ESCOPO: apenas topo, nav desktop, hamburger e menu lateral.
+   Nada aqui deve ser reutilizado por outros componentes;
+   classes reutilizáveis pertencem a styles.css.
+   ============================================================ */
 
-/* ✅ HEADER */
+/* ---------- barra de topo ---------- */
 .topo {
-  background: white;
-  border-bottom: 1px solid var(--linha);
+  background: var(--campo-escuro);
+  border-bottom: 4px solid var(--amarelo);
   position: sticky;
   top: 0;
   z-index: 100;
 }
-
 .topo-inner {
   max-width: 1200px;
   margin: 0 auto;
@@ -20,72 +22,69 @@
   gap: 16px;
 }
 
+/* ---------- logotipo ---------- */
 .logo {
-  font-weight: 700;
-  font-size: 18px;
-  color: var(--tinta);
+  font-family: var(--fonte-display);
+  font-weight: 400;
+  font-size: 20px;
+  letter-spacing: .5px;
+  color: var(--branco);
 }
-
 .logo span {
-  font-size: 12px;
-  color: var(--tinta-fraca);
-  display: block;
+  color: var(--amarelo);
 }
 
+/* ---------- nav desktop ---------- */
 .nav {
   display: flex;
-  gap: 8px;
-  flex: 1;
+  gap: 4px;
+  flex-wrap: wrap;
+  margin-left: auto;
 }
-
 .nav a {
-  padding: 8px 12px;
-  border-radius: 4px;
   text-decoration: none;
-  color: var(--tinta);
+  padding: 8px 12px;
+  border-radius: 6px;
   font-size: 14px;
   font-weight: 600;
-  transition: all 0.2s ease;
+  color: #cfe6d4;
+  transition: background 0.2s ease, color 0.2s ease;
 }
+.nav a:hover { background: rgba(255,255,255,.08); color: var(--branco); }
+.nav a.ativo  { background: var(--campo); color: var(--branco); }
 
-.nav a:hover,
-.nav a.ativo {
-  background: var(--fundo);
-  color: var(--campo);
+/* ---------- info do usuário (desktop) ---------- */
+.usuario {
+  font-size: 13px;
+  color: #cfe6d4;
+  display: flex;
+  gap: 10px;
+  align-items: center;
 }
+.usuario span { font-size: 14px; color: #cfe6d4; }
 
+/* ---------- botão sair ---------- */
+.btn-sair {
+background: var(--vermelho);
+color: white;
+border: none;
+padding: 8px 16px;
+border-radius: 4px;
+font-weight: 700;
+cursor: pointer;
+transition: opacity 0.2s ease;
+}
+.btn-sair:hover {
+opacity: 0.9;
+}
+/* ---------- atalho admin ---------- */
 .admin-link {
   background: #ff9800 !important;
   color: white !important;
+  border-color: transparent !important;
 }
 
-.usuario {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.usuario span {
-  font-size: 14px;
-  color: var(--tinta);
-}
-
-.btn-sair {
-  background: var(--vermelho);
-  color: white;
-  border: none;
-  padding: 8px 16px;
-  border-radius: 4px;
-  font-weight: 700;
-  cursor: pointer;
-  transition: opacity 0.2s ease;
-}
-
-.btn-sair:hover {
-  opacity: 0.9;
-}
-
-/* ✅ HAMBURGER MENU */
+/* ---------- hamburger (mobile) ---------- */
 .hamburger {
   display: none;
   flex-direction: column;
@@ -95,28 +94,18 @@
   gap: 5px;
   padding: 0;
 }
-
 .hamburger span {
   width: 24px;
   height: 2px;
-  background: var(--tinta);
+  background: var(--branco);
   border-radius: 2px;
-  transition: all 0.3s ease;
+  transition: transform 0.3s ease, opacity 0.3s ease;
 }
+.hamburger.ativo span:nth-child(1) { transform: rotate(45deg)  translate(5px, 7px); }
+.hamburger.ativo span:nth-child(2) { opacity: 0; }
+.hamburger.ativo span:nth-child(3) { transform: rotate(-45deg) translate(5px, -7px); }
 
-.hamburger.ativo span:nth-child(1) {
-  transform: rotate(45deg) translate(8px, 8px);
-}
-
-.hamburger.ativo span:nth-child(2) {
-  opacity: 0;
-}
-
-.hamburger.ativo span:nth-child(3) {
-  transform: rotate(-45deg) translate(7px, -7px);
-}
-
-/* ✅ MENU OVERLAY */
+/* ---------- overlay do menu lateral ---------- */
 .menu-overlay {
   display: none;
   position: fixed;
@@ -125,14 +114,16 @@
   z-index: 99;
   opacity: 0;
   transition: opacity 0.3s ease;
+  pointer-events: none;  // ✅ ADICIONE ISTO
 }
 
 .menu-overlay.ativo {
   display: block;
   opacity: 1;
+  pointer-events: auto;  // ✅ E ISTO
 }
 
-/* ✅ MENU LATERAL */
+/* ---------- menu lateral (drawer) ---------- */
 .menu-lateral {
   display: none;
   position: fixed;
@@ -140,21 +131,19 @@
   top: 0;
   height: 100vh;
   width: 280px;
-  background: white;
+  background: var(--branco);
   z-index: 101;
   flex-direction: column;
   padding: 16px;
-  gap: 8px;
+  gap: 4px;
   transform: translateX(-100%);
   transition: transform 0.3s ease;
   overflow-y: auto;
   box-shadow: 2px 0 10px rgba(0, 0, 0, 0.1);
 }
+.menu-lateral.ativo { transform: translateX(0); }
 
-.menu-lateral.ativo {
-  transform: translateX(0);
-}
-
+/* ---------- cabeçalho do drawer ---------- */
 .fechar-menu {
   align-self: flex-end;
   background: none;
@@ -164,51 +153,35 @@
   color: var(--tinta);
   padding: 4px;
   margin-bottom: 12px;
+  line-height: 1;
 }
-
 .usuario-menu {
   padding: 12px;
   border-bottom: 1px solid var(--linha);
   margin-bottom: 8px;
 }
+.usuario-menu .nome  { font-weight: 700; color: var(--tinta); font-size: 16px; margin-bottom: 4px; }
+.usuario-menu .email { font-size: 12px; color: var(--tinta-fraca); }
 
-.usuario-menu .nome {
-  font-weight: 700;
-  color: var(--tinta);
-  font-size: 16px;
-  margin-bottom: 4px;
-}
-
-.usuario-menu .email {
-  font-size: 12px;
-  color: var(--tinta-fraca);
-}
-
+/* ---------- itens de navegação do drawer ---------- */
 .menu-item {
+  display: block;
   padding: 12px 16px;
   border-radius: 6px;
   text-decoration: none;
   color: var(--tinta);
   font-size: 16px;
   font-weight: 600;
-  transition: all 0.2s ease;
-  display: block;
+  transition: background 0.2s ease, color 0.2s ease;
   cursor: pointer;
   border: none;
   background: none;
   text-align: left;
+  width: 100%;
 }
-
 .menu-item:hover,
-.menu-item.ativo {
-  background: var(--fundo);
-  color: var(--campo);
-}
-
-.menu-item.admin-link {
-  background: #ff9800;
-  color: white;
-}
+.menu-item.ativo      { background: var(--fundo); color: var(--campo); }
+.menu-item.admin-link { background: #ff9800; color: white; }
 
 .btn-sair-mobile {
   background: var(--vermelho) !important;
@@ -216,44 +189,21 @@
   margin-top: auto;
 }
 
-/* ✅ RESPONSIVE - TABLET & MOBILE */
+/* ---------- responsivo ---------- */
 @media (max-width: 768px) {
-  .topo-inner {
-    gap: 12px;
-  }
+  .topo-inner { gap: 12px; }
 
-  .hamburger {
-    display: flex;
-  }
+  /* mostra hamburger, esconde nav desktop */
+  .hamburger { display: flex; }
+  .nav        { display: none; }
 
-  .nav {
-    display: none;
-  }
+  /* esconde nome do usuário; mantém botão sair */
+  .usuario span { display: none; }
 
-  .usuario {
-    flex-direction: column;
-    gap: 8px;
-  }
+  /* ativa os elementos do drawer */
+  .menu-overlay  { display: block; }
+  .menu-lateral  { display: flex; }
 
-  .usuario span {
-    display: none;
-  }
-
-  .menu-overlay {
-    display: block;
-  }
-
-  .menu-lateral {
-    display: flex;
-  }
-
-  .logo {
-    flex: 1;
-    text-align: center;
-    font-size: 14px;
-  }
-
-  .logo span {
-    font-size: 10px;
-  }
+  /* logo centralizado e menor */
+  .logo { flex: 1; text-align: center; font-size: 16px; }
 }

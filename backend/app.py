@@ -649,20 +649,17 @@ def enviar_push(subscription, titulo, mensagem, opcoes=None):
     """
     ✅ Envia push notification para um usuário
     """
-    vapid_public_key = os.getenv("VAPID_PUBLIC_KEY")
     vapid_private_key = os.getenv("VAPID_PRIVATE_KEY")
     frontend_url = os.getenv("FRONTEND_URL", "")
     vapid_claims = {"sub": "mailto:seu-email@example.com"}
-
+    
     payload = {
         "title": titulo,
         "body": mensagem,
-        "icon": f"{frontend_url}/assets/icon-192.png",  # ✅ URL absoluta
-        "badge": f"{frontend_url}/assets/icon-192.png",  # ✅ URL absoluta
+        "icon": f"{frontend_url}/assets/icon-192.png",
+        "badge": f"{frontend_url}/assets/icon-192.png",
         "tag": opcoes.get("tag", "notificacao") if opcoes else "notificacao",
-        "requireInteraction": opcoes.get("requireInteraction", False)
-        if opcoes
-        else False,
+        "requireInteraction": opcoes.get("requireInteraction", False) if opcoes else False,
         **(opcoes or {}),
     }
 
@@ -673,8 +670,7 @@ def enviar_push(subscription, titulo, mensagem, opcoes=None):
                 "keys": {"auth": subscription.auth, "p256dh": subscription.p256dh},
             },
             data=json.dumps(payload),
-            vapid_public_key=vapid_public_key,
-            vapid_private_key=vapid_private_key,
+            vapid_private_key=vapid_private_key,  # ✅ APENAS ISTO
             vapid_claims=vapid_claims,
         )
         return True
@@ -684,7 +680,6 @@ def enviar_push(subscription, titulo, mensagem, opcoes=None):
             db.session.delete(subscription)
             db.session.commit()
         return False
-
 
 # ================================================================ ENDPOINTS DE TESTE
 @app.post("/api/test-notification")
