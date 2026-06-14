@@ -172,16 +172,16 @@ def verificar_jogos_proximos():
                         jogo_id=jogo_30min.id,
                         user_id=sub.user_id
                     ).first()
-                # ✅ ENVIAR SE NÃO FEZ APOSTA
-                if not aposta:
-                    enviar_push(
-                        sub,
-                        f"⏰ {jogo_30min.time1.nome} vs {jogo_30min.time2.nome}",
-                        "Faltam 30 minutos! Você ainda não apostou!",
-                        {"tag": "lembrete-30min", "requireInteraction": True},
-                    )
-                else:
-                    print(f"   ✓ Usuário {sub.user_id} já apostou")
+                    # ✅ ENVIAR SE NÃO FEZ APOSTA
+                    if not aposta:
+                        enviar_push(
+                            sub,
+                            f"⏰ {jogo_30min.time1.nome} vs {jogo_30min.time2.nome}",
+                            "Faltam 30 minutos! Você ainda não apostou!",
+                            {"tag": "lembrete-30min", "requireInteraction": True},
+                        )
+                    else:
+                        print(f"   ✓ Usuário {sub.user_id} já apostou")
 
             # Enviar notificações para jogo em 10 minutos
             if jogo_10min and subs:
