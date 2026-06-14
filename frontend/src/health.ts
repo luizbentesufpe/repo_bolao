@@ -1,10 +1,7 @@
-import { inject } from '@angular/core';
 import { ApiService } from './app/core/api.service';
 
-export function initHealth() {
+export function initHealth(api: ApiService) {
   return () => {
-    const api = inject(ApiService);
-
     const check = () => {
       api.sincronizar().subscribe({
         next: (res) => console.log('🔄 Sync:', res),
