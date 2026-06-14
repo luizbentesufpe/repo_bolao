@@ -4,6 +4,8 @@ Models do bolao em Flask/SQLAlchemy, espelhando o estilo do Django original:
 Time, Campeonato, Jogo, Aposta (+ User para o login basico).
 """
 
+from datetime import datetime
+
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import check_password_hash, generate_password_hash
 
@@ -32,6 +34,28 @@ class User(db.Model):
 
     def __repr__(self):
         return self.nome
+
+
+class NotificationSubscription(db.Model):
+    __tablename__ = "notification_subscriptions"
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    endpoint = db.Column(db.String(500), unique=True, nullable=False)
+    auth = db.Column(db.String(100), nullable=False)
+    p256dh = db.Column(db.String(200), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    user = db.relationship("User", backref="notification_subscriptions")
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "endpoint": self.endpoint,
+            "auth": self.auth,
+            "p256dh": self.p256dh,
+            "created_at": self.created_at.isoformat(),
+        }
 
 
 class Time(db.Model):

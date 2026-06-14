@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { AuthService } from '../core/auth.service';
 import { Router } from '@angular/router';
+import { NotificationPermissionService } from '../core/notification.permission.service';
 
 @Component({
   selector: 'app-perfil',
@@ -52,6 +53,42 @@ import { Router } from '@angular/router';
               style="width: 100%; padding: 12px; background: var(--campo); color: white; border: none; border-radius: 6px; font-weight: 700; cursor: pointer; margin-bottom: 12px;">
               ✅ Atualizar Nome
             </button>
+          </div>
+
+          <!-- SEÇÃO: NOTIFICAÇÕES -->
+          <div style="background: linear-gradient(135deg, rgba(66,165,245,0.1) 0%, rgba(25,118,210,0.1) 100%); border: 2px solid #42a5f5; padding: 24px; border-radius: 12px; margin-bottom: 20px;">
+            <h2 style="font-family: var(--fonte-display); font-size: 16px; margin-bottom: 12px; color: var(--tinta);">
+              🔔 Notificações
+            </h2>
+            
+            <p style="font-size: 13px; color: var(--tinta-fraca); margin-bottom: 16px; line-height: 1.6;">
+              Receba lembretes automáticos antes de cada jogo.
+            </p>
+
+            <div style="background: white; padding: 12px; border-radius: 8px; margin-bottom: 16px; border-left: 4px solid #42a5f5;">
+              <div style="font-size: 12px; color: #666;">
+                <strong>Status:</strong><br>
+                @if (notificacoesAtivas) {
+                  <span style="color: var(--campo); font-weight: 700;">✅ Ativadas</span>
+                } @else {
+                  <span style="color: var(--tinta-fraca);">❌ Desativadas</span>
+                }
+              </div>
+            </div>
+
+            @if (!notificacoesAtivas) {
+              <button 
+                (click)="ativarNotificacoes()"
+                style="width: 100%; padding: 12px; background: #42a5f5; color: white; border: none; border-radius: 6px; font-weight: 700; cursor: pointer;">
+                🔔 Ativar Notificações
+              </button>
+            } @else {
+              <button 
+                (click)="testarNotificacao()"
+                style="width: 100%; padding: 12px; background: #42a5f5; color: white; border: none; border-radius: 6px; font-weight: 700; cursor: pointer;">
+                🧪 Testar Notificação
+              </button>
+            }
           </div>
 
           <!-- SEÇÃO: SEGURANÇA -->
@@ -114,9 +151,11 @@ export class PerfilComponent implements OnInit {
   senhaAtual = '';
   novaSenha = '';
   confirmarSenha = '';
+  notificacoesAtivas = false; // ✅ ADICIONADO
 
   constructor(
     private auth: AuthService,
+    private notifPermission: NotificationPermissionService, // ✅ ADICIONADO
     private router: Router
   ) {
     this.usuario = auth.usuario();
@@ -127,7 +166,10 @@ export class PerfilComponent implements OnInit {
     this.novoNome = this.usuario.nome;
   }
 
-  ngOnInit() {}
+  ngOnInit() {
+    // ✅ ADICIONADO: Verificar status das notificações
+    this.notificacoesAtivas = this.notifPermission.estaPermitido();
+  }
 
   atualizarNome() {
     if (!this.novoNome.trim()) {
@@ -135,7 +177,6 @@ export class PerfilComponent implements OnInit {
       return;
     }
 
-    // ✅ CORRIGIDO: Usa AuthService
     this.auth.atualizarPerfil({ nome: this.novoNome }).subscribe({
       next: () => {
         alert('✅ Nome atualizado com sucesso!');
@@ -144,6 +185,25 @@ export class PerfilComponent implements OnInit {
         alert('❌ Erro ao atualizar: ' + (err.error?.erro || 'Tente novamente'));
       }
     });
+  }
+
+  // ✅ ADICIONADO: Ativar notificações
+  async ativarNotificacoes() {
+    const permissao = await this.notifPermission.solicitarPermissao();
+    this.notificacoesAtivas = permissao === 'granted';
+    
+    if (this.notificacoesAtivas) {
+      alert('✅ Notificações ativadas com sucesso!');
+      this.notifPermission.testarNotificacao();
+    } else {
+      alert('⚠️ Notificações foram bloqueadas. Verifique as configurações do navegador.');
+    }
+  }
+
+  // ✅ ADICIONADO: Testar notificação
+  testarNotificacao() {
+    this.notifPermission.testarNotificacao();
+    alert('📢 Verifique se recebeu a notificação!');
   }
 
   atualizarSenha() {
@@ -160,10 +220,8 @@ export class PerfilComponent implements OnInit {
       return;
     }
 
-    // ✅ CORRIGIDO: Usa AuthService
     this.auth.login(this.usuario.email, this.senhaAtual).subscribe({
       next: () => {
-        // Agora reseta a senha
         this.auth.resetarSenha(this.novaSenha).subscribe({
           next: () => {
             alert('✅ Senha alterada com sucesso! Faça login novamente.');

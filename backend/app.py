@@ -1,24 +1,24 @@
 # -*- coding: utf-8 -*-
 """
-API do Bolao da Copa 2026 (Flask).
-
-🚀 OTIMIZAÇÃO FINAL: 2 ENDPOINTS SEPARADOS
+API do Bolao da Copa 2026 (Flask com APScheduler).
+🚀 FINAL: 2 ENDPOINTS SEPARADOS + SCHEDULER AUTOMÁTICO
 1. GET /api/jogos → Dados do banco (< 500ms, SEM cache)
 2. POST /api/sincronizar → Sincroniza com API (background, COM cache 5 min)
-
+3. SCHEDULER → Notificações automáticas 30min e 10min antes dos jogos
 ✅ CACHE CORRETO:
 - Dados do BANCO: Sem cache (sempre fresco)
 - Chamadas EXTERNAS (API football-data): Com cache 5 min
-
 Rodar:
     pip install -r requirements.txt
     python seed.py        # cria o banco e popula os 72 jogos da fase de grupos
     flask --app app run --debug   # http://localhost:5000
 """
 
+import json
 import os
 from datetime import datetime, timedelta
 
+from apscheduler.schedulers.background import BackgroundScheduler
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 from flask_jwt_extended import (
@@ -27,7 +27,8 @@ from flask_jwt_extended import (
     get_jwt_identity,
     jwt_required,
 )
-from models import Aposta, Jogo, User, db
+from models import Aposta, Jogo, NotificationSubscription, User, db
+from pywebpush import WebPushException, webpush
 from sync_knockout import seed_knockout_matches
 
 app = Flask(__name__)
@@ -45,7 +46,6 @@ app.config["JWT_ACCESS_TOKEN_EXPIRES"] = timedelta(days=7)
 
 ultimo_sync_timestamp = None
 
-
 db.init_app(app)
 jwt = JWTManager(app)
 CORS(
@@ -56,12 +56,16 @@ CORS(
                 "https://bolao-web-0s5h.onrender.com",
                 "https://repo-bolao-1.onrender.com",
                 "https://pwa-test-m02z.onrender.com",
+                "http://localhost:4200",
             ],
             "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
             "allow_headers": ["Content-Type", "Authorization"],
         }
     },
 )
+
+# ✅ SCHEDULER PARA NOTIFICAÇÕES AUTOMÁTICAS
+scheduler = BackgroundScheduler()
 
 # ✅ Cache para sincronização on-demand
 ultimo_sync = None
@@ -79,6 +83,111 @@ def resposta_sem_cache(data):
     response.headers["Pragma"] = "no-cache"
     response.headers["Expires"] = "0"
     return response
+
+
+# ✅ FUNÇÃO PARA ENVIAR NOTIFICAÇÕES (PUSH)
+def enviar_push(subscription, titulo, mensagem, opcoes=None):
+    """
+    ✅ Envia push notification para um usuário
+    """
+    vapid_private_key = os.getenv("VAPID_PRIVATE_KEY")
+    frontend_url = os.getenv("FRONTEND_URL", "")
+    vapid_claims = {"sub": "mailto:seu-email@example.com"}
+
+    payload = {
+        "title": titulo,
+        "body": mensagem,
+        "icon": f"{frontend_url}/assets/icon-192.png",
+        "badge": f"{frontend_url}/assets/icon-192.png",
+        "tag": opcoes.get("tag", "notificacao") if opcoes else "notificacao",
+        "requireInteraction": opcoes.get("requireInteraction", False)
+        if opcoes
+        else False,
+        **(opcoes or {}),
+    }
+
+    try:
+        webpush(
+            subscription_info={
+                "endpoint": subscription.endpoint,
+                "keys": {"auth": subscription.auth, "p256dh": subscription.p256dh},
+            },
+            data=json.dumps(payload),
+            vapid_private_key=vapid_private_key,
+            vapid_claims=vapid_claims,
+        )
+        return True
+    except WebPushException as e:
+        print(f"❌ Erro ao enviar push: {e}")
+        try:
+            db.session.delete(subscription)
+            db.session.commit()
+        except:
+            pass
+        return False
+
+
+# ✅ FUNÇÃO DO SCHEDULER - VERIFICA JOGOS PRÓXIMOS
+def verificar_jogos_proximos():
+    """
+    ⏰ Verifica jogos que começam em 30 min e 10 min
+    Envia notificações para usuários inscritos
+    Roda a cada 5 minutos em background
+    """
+    try:
+        print(
+            f"[{datetime.now().strftime('%H:%M:%S')}] 🔔 Verificando jogos próximos..."
+        )
+
+        with app.app_context():
+            agora = datetime.now()
+
+            # Jogos que começam em ~30 minutos
+            jogo_30min = Jogo.query.filter(
+                Jogo.data_hora > agora + timedelta(minutes=25),
+                Jogo.data_hora < agora + timedelta(minutes=35),
+                Jogo.status_api == "TIMED",
+                Jogo.gols_time1.is_(None),
+            ).first()
+
+            # Jogos que começam em ~10 minutos
+            jogo_10min = Jogo.query.filter(
+                Jogo.data_hora > agora + timedelta(minutes=5),
+                Jogo.data_hora < agora + timedelta(minutes=15),
+                Jogo.status_api == "TIMED",
+                Jogo.gols_time1.is_(None),
+            ).first()
+
+            # Obter todas as subscriptions
+            subs = NotificationSubscription.query.all()
+
+            # Enviar notificações para jogo em 30 minutos
+            if jogo_30min and subs:
+                print(
+                    f"⏰ Enviando lembretes (30min): {jogo_30min.time1.nome} vs {jogo_30min.time2.nome}"
+                )
+                for sub in subs:
+                    enviar_push(
+                        sub,
+                        f"⏰ {jogo_30min.time1.nome} vs {jogo_30min.time2.nome}",
+                        "Faltam 30 minutos! Não esqueça sua aposta!",
+                        {"tag": "lembrete-30min", "requireInteraction": True},
+                    )
+
+            # Enviar notificações para jogo em 10 minutos
+            if jogo_10min and subs:
+                print(
+                    f"⚽ Enviando lembretes (10min): {jogo_10min.time1.nome} vs {jogo_10min.time2.nome}"
+                )
+                for sub in subs:
+                    enviar_push(
+                        sub,
+                        f"⚽ {jogo_10min.time1.nome} vs {jogo_10min.time2.nome}",
+                        "COMEÇANDO EM 10 MINUTOS! Confira sua aposta!",
+                        {"tag": "lembrete-10min", "requireInteraction": True},
+                    )
+    except Exception as e:
+        print(f"❌ Erro ao verificar jogos próximos: {e}")
 
 
 # ✅ FUNÇÃO PARA CALCULAR PONTOS
@@ -122,7 +231,7 @@ def calcular_pontos(aposta, jogo):
     return 0
 
 
-# ========================================== FUNÇÃO PARA RECALCULAR PONTOS
+# ✅ FUNÇÃO PARA RECALCULAR PONTOS
 def recalcular_pontos_jogo(jogo):
     """Recalcula pontos quando jogo termina (status = FINISHED)"""
 
@@ -228,7 +337,6 @@ def listar_jogos():
     Cache: ❌ SEM cache (dados sempre frescos)
     """
     query = Jogo.query.order_by(Jogo.data_hora)
-
     user_id = get_jwt_identity()
     minhas = {}
     if user_id:
@@ -395,7 +503,7 @@ def ranking():
         item = tabela.setdefault(
             aposta.user_id,
             {
-                "email": aposta.user.email,  # ✅ ADICIONADO: email para comparação
+                "email": aposta.user.email,
                 "nome": aposta.user.nome,
                 "pontos": 0,
                 "exatos": 0,
@@ -556,5 +664,285 @@ def health():
     return {"status": "ok", "timestamp": datetime.now().isoformat()}, 200
 
 
+# ================================================================ NOTIFICAÇÕES - ENDPOINTS
+@app.get("/api/notifications/status")
+@jwt_required()
+def notificacoes_status():
+    """Verificar se usuário tem subscription de notificações no banco"""
+    user_id = int(get_jwt_identity())
+    tem_subscription = (
+        NotificationSubscription.query.filter_by(user_id=user_id).first() is not None
+    )
+
+    return resposta_sem_cache({"ativadas": tem_subscription, "user_id": user_id}), 200
+
+
+@app.post("/api/notifications/subscribe")
+@jwt_required()
+def subscribe_notifications():
+    """
+    ✅ Cliente envia sua subscription do Service Worker
+    O servidor armazena para enviar push depois
+    Aceita ambos os formatos:
+    1. {endpoint, auth, p256dh}
+    2. {endpoint, keys: {auth, p256dh}}
+    """
+    user_id = int(get_jwt_identity())
+    dados = request.get_json(silent=True) or {}
+
+    endpoint = dados.get("endpoint")
+
+    # ✅ NOVO: Aceita ambos os formatos
+    auth = dados.get("auth") or dados.get("keys", {}).get("auth")
+    p256dh = dados.get("p256dh") or dados.get("keys", {}).get("p256dh")
+
+    if not endpoint or not auth or not p256dh:
+        return resposta_sem_cache({"erro": "Dados de subscription incompletos."}), 400
+
+    # Verifica se já existe
+    sub = NotificationSubscription.query.filter_by(endpoint=endpoint).first()
+    if sub:
+        sub.user_id = user_id
+        sub.auth = auth
+        sub.p256dh = p256dh
+    else:
+        sub = NotificationSubscription(
+            user_id=user_id, endpoint=endpoint, auth=auth, p256dh=p256dh
+        )
+        db.session.add(sub)
+
+    db.session.commit()
+
+    return resposta_sem_cache(
+        {"ok": True, "msg": "Subscription registrada com sucesso!"}
+    ), 201
+
+
+@app.delete("/api/notifications/unsubscribe")
+@jwt_required()
+def unsubscribe_notifications():
+    """
+    ✅ Remove subscription quando usuário desativa notificações
+    """
+    user_id = int(get_jwt_identity())
+    dados = request.get_json(silent=True) or {}
+    endpoint = dados.get("endpoint")
+
+    if not endpoint:
+        return resposta_sem_cache({"erro": "Endpoint não fornecido."}), 400
+
+    sub = NotificationSubscription.query.filter_by(
+        user_id=user_id, endpoint=endpoint
+    ).first()
+
+    if sub:
+        db.session.delete(sub)
+        db.session.commit()
+
+    return resposta_sem_cache({"ok": True, "msg": "Unsubscribed"}), 200
+
+
+# ================================================================ ENDPOINTS DE TESTE
+@app.post("/api/test-notification")
+@jwt_required()
+def test_notification():
+    """Envia notificação de teste para todos"""
+    subs = NotificationSubscription.query.all()
+
+    if not subs:
+        return resposta_sem_cache({"ok": False, "msg": "Nenhuma subscription"}), 400
+
+    enviadas = 0
+    for sub in subs:
+        result = enviar_push(
+            sub,
+            "🧪 Notificação de Teste!",
+            "Push notifications funcionando!",
+            {"tag": "test-notification"},
+        )
+        if result:
+            enviadas += 1
+
+    return resposta_sem_cache(
+        {"ok": True, "enviadas": enviadas, "total": len(subs)}
+    ), 200
+
+
+@app.post("/api/test-notification-all")
+@jwt_required()
+def test_notification_all():
+    """
+    ✅ Envia notificação de teste para TODOS os usuários inscritos
+    ⚠️ APENAS PARA TESTE/DEBUG
+    """
+    user_id = int(get_jwt_identity())
+
+    subs = NotificationSubscription.query.all()
+
+    if not subs:
+        return resposta_sem_cache(
+            {"ok": False, "msg": "Nenhuma subscription no banco"}
+        ), 400
+
+    enviadas = 0
+    for sub in subs:
+        result = enviar_push(
+            sub,
+            "🧪 Notificação de Teste para Todos!",
+            "Esta é uma notificação de teste enviada para todos os usuários.",
+            {"tag": "test-notification-all"},
+        )
+        if result:
+            enviadas += 1
+
+    return resposta_sem_cache(
+        {
+            "ok": True,
+            "msg": "Notificação de teste enviada para todos",
+            "enviadas": enviadas,
+            "total": len(subs),
+        }
+    ), 200
+
+
+# ================================================================ INICIAR SCHEDULER NA PRIMEIRA REQUISIÇÃO
+def init_scheduler():
+    """
+    ✅ Inicia o scheduler quando a primeira requisição chega
+    Não bloqueia o app, roda em background thread
+    """
+    try:
+        if not scheduler.running:
+            # Verifica jogos próximos a cada 5 minutos
+            scheduler.add_job(
+                verificar_jogos_proximos,
+                "interval",
+                minutes=5,
+                id="verificar_jogos",
+                replace_existing=True,
+            )
+            scheduler.start()
+            print("✅ [APScheduler] Iniciado! Verificando jogos a cada 5 min")
+    except Exception as e:
+        print(f"❌ Erro ao iniciar scheduler: {e}")
+
+
+# ================================================================ TESTE DO SCHEDULER
+@app.post("/api/scheduler/test-simulate")
+@jwt_required()
+def scheduler_test_simulate():
+    """
+    🧪 Simula um jogo começando em 30min para testar o scheduler
+    - Cria jogo fake
+    - Executa verificar_jogos_proximos()
+    - Deleta jogo fake
+    - Retorna resultado
+    """
+    try:
+        print("\n" + "=" * 60)
+        print("🧪 INICIANDO TESTE DO SCHEDULER")
+        print("=" * 60)
+
+        from models import Campeonato, Time
+
+        time1 = Time.query.first()
+        time2 = Time.query.filter(Time.id != time1.id).first()
+        campeonato = Campeonato.query.first()  # ✅ Pegar um campeonato
+
+        if not time1 or not time2 or not campeonato:
+            return resposta_sem_cache(
+                {"ok": False, "msg": "Erro: faltam times ou campeonato no banco"}
+            ), 400
+
+        # Criar jogo que começa em 30 minutos
+        agora = datetime.now()
+        data_jogo_30min = agora + timedelta(minutes=28)
+
+        jogo_fake = Jogo(
+            campeonato_id=campeonato.id,
+            time1_id=time1.id,
+            time2_id=time2.id,
+            data_hora=data_jogo_30min,
+            estadio="🧪 SIMULADO",
+            status_api="TIMED",
+        )
+        db.session.add(jogo_fake)
+        db.session.commit()
+
+        print(f"✅ Jogo simulado criado: ID {jogo_fake.id}")
+        print(f"   Time 1: {time1.nome}")
+        print(f"   Time 2: {time2.nome}")
+        print(f"   Começa em: {jogo_fake.data_hora.strftime('%H:%M:%S')}")
+        print("   Diferença: 28 minutos (vai disparar notificação de 30min)")
+
+        # Executar a função do scheduler manualmente
+        print("\n🔔 Executando verificar_jogos_proximos()...")
+        verificar_jogos_proximos()
+
+        # Deletar jogo fake
+        db.session.delete(jogo_fake)
+        db.session.commit()
+
+        print("✅ Jogo simulado deletado")
+        print("=" * 60)
+
+        return resposta_sem_cache(
+            {
+                "ok": True,
+                "msg": "✅ Teste do scheduler executado com sucesso!",
+                "detalhes": {
+                    "jogo_criado": f"{time1.nome} vs {time2.nome}",
+                    "horario": data_jogo_30min.strftime("%H:%M:%S"),
+                    "scheduler_status": "running" if scheduler.running else "stopped",
+                },
+            }
+        ), 200
+
+    except Exception as e:
+        print(f"❌ Erro no teste: {e}")
+        import traceback
+
+        traceback.print_exc()
+        return resposta_sem_cache(
+            {"ok": False, "msg": f"Erro ao simular: {str(e)}"}
+        ), 500
+
+
+@app.get("/api/scheduler/status")
+def scheduler_status():
+    """
+    🔍 Verificar status do APScheduler
+    """
+    jobs = scheduler.get_jobs()
+
+    return resposta_sem_cache(
+        {
+            "ok": True,
+            "scheduler_running": scheduler.running,
+            "total_jobs": len(jobs),
+            "jobs": [
+                {
+                    "id": job.id,
+                    "name": job.name,
+                    "trigger": str(job.trigger),
+                    "next_run_time": job.next_run_time.isoformat()
+                    if job.next_run_time
+                    else None,
+                }
+                for job in jobs
+            ],
+        }
+    ), 200
+
+
+@app.before_request
+def antes_requisicao():
+    """Inicializa scheduler na primeira requisição"""
+    init_scheduler()
+
+
 if __name__ == "__main__":
-    app.run(debug=True)
+    with app.app_context():
+        db.create_all()
+        init_scheduler()
+    app.run(debug=False, threaded=True)

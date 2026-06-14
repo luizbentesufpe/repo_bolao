@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { environment } from '../../environment/environment.prod';
+import { environment } from '../../environment/environment';
 
 /**
  * 🚀 SERVIÇO DE SINCRONIZAÇÃO OTIMIZADO
