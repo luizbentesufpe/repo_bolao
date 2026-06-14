@@ -6,6 +6,7 @@ import localePt from '@angular/common/locales/pt';
 import { routes } from './app.routes';
 import { authInterceptor } from './core/auth.interceptor';
 import { initHealth } from '../health';
+import { ApiService } from './core/api.service';
 
 registerLocaleData(localePt);
 
@@ -17,7 +18,7 @@ export const appConfig: ApplicationConfig = {
     {
       provide: APP_INITIALIZER,
       useFactory: initHealth,
-      deps: [],
+      deps: [ApiService],
       multi: true
     }
   ],
