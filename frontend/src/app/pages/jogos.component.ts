@@ -29,7 +29,7 @@ import { SincronizacaoService } from '../core/sincronizacao.service';
       @for (dia of dias; track dia.chave) {
         <!-- JOGOS ATIVOS -->
         @if (dia.jogosAtivos.length > 0) {
-          <div class="dia-grupo"><span class="rotulo">{{ dia.data | date:'EEEE, d MMMM' }}</span></div>
+          <div class="dia-grupo"><span class="rotulo">{{ dia.data | date:'EEEE, d MMM':'pt-BR' }}</span></div>
           @for (jogo of dia.jogosAtivos; track jogo.id) {
             <article class="jogo-card">
               <div class="jogo-time">
