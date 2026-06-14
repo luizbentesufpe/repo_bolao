@@ -142,7 +142,7 @@ def verificar_jogos_proximos():
         with app.app_context():
             agora = datetime.now()
 
-            # Jogos que começam em ~30 minutos
+            # ✅ Jogos que começam em ~30 minutos
             jogo_30min = Jogo.query.filter(
                 Jogo.data_hora > agora + timedelta(minutes=25),
                 Jogo.data_hora < agora + timedelta(minutes=35),
@@ -150,7 +150,7 @@ def verificar_jogos_proximos():
                 Jogo.gols_time1.is_(None),
             ).first()
 
-            # Jogos que começam em ~10 minutos
+            # ✅ Jogos que começam em ~10 minutos
             jogo_10min = Jogo.query.filter(
                 Jogo.data_hora > agora + timedelta(minutes=5),
                 Jogo.data_hora < agora + timedelta(minutes=15),
@@ -163,16 +163,25 @@ def verificar_jogos_proximos():
 
             # Enviar notificações para jogo em 30 minutos
             if jogo_30min and subs:
+
                 print(
                     f"⏰ Enviando lembretes (30min): {jogo_30min.time1.nome} vs {jogo_30min.time2.nome}"
                 )
                 for sub in subs:
-                    enviar_push(
-                        sub,
-                        f"⏰ {jogo_30min.time1.nome} vs {jogo_30min.time2.nome}",
-                        "Faltam 30 minutos! Não esqueça sua aposta!",
-                        {"tag": "lembrete-30min", "requireInteraction": True},
-                    )
+                    aposta = Aposta.query.filter_by(
+                        jogo_id=jogo_30min.id,
+                        user_id=sub.user_id
+                    ).first()
+                    # ✅ ENVIAR SE NÃO FEZ APOSTA
+                    if not aposta:
+                        enviar_push(
+                            sub,
+                            f"⏰ {jogo_30min.time1.nome} vs {jogo_30min.time2.nome}",
+                            "Faltam 30 minutos! Você ainda não apostou!",
+                            {"tag": "lembrete-30min", "requireInteraction": True},
+                        )
+                    else:
+                        print(f"   ✓ Usuário {sub.user_id} já apostou")
 
             # Enviar notificações para jogo em 10 minutos
             if jogo_10min and subs:
@@ -180,12 +189,21 @@ def verificar_jogos_proximos():
                     f"⚽ Enviando lembretes (10min): {jogo_10min.time1.nome} vs {jogo_10min.time2.nome}"
                 )
                 for sub in subs:
-                    enviar_push(
-                        sub,
-                        f"⚽ {jogo_10min.time1.nome} vs {jogo_10min.time2.nome}",
-                        "COMEÇANDO EM 10 MINUTOS! Confira sua aposta!",
-                        {"tag": "lembrete-10min", "requireInteraction": True},
-                    )
+                    aposta = Aposta.query.filter_by(
+                                jogo_id=jogo_10min.id,
+                                user_id=sub.user_id
+                            ).first()
+                            
+                    # ✅ ENVIAR SE NÃO FEZ APOSTA
+                    if not aposta:
+                        enviar_push(
+                            sub,
+                            f"⚽ {jogo_10min.time1.nome} vs {jogo_10min.time2.nome}",
+                            "COMEÇANDO EM 10 MINUTOS! Você ainda não apostou!",
+                            {"tag": "lembrete-10min", "requireInteraction": True},
+                        )
+                    else:
+                        print(f"   ✓ Usuário {sub.user_id} já apostou")
     except Exception as e:
         print(f"❌ Erro ao verificar jogos próximos: {e}")
 

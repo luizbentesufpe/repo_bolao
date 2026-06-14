@@ -5,6 +5,8 @@ import { AuthService } from '../core/auth.service';
 import { GameReminderService } from '../core/game-reminder.service';
 import { NotificationPermissionService } from '../core/notification.permission.service';
 import { DeviceService } from '../core/device.service';
+import { PwaInstallService } from '../core/pwa-install.service';
+import { BackButtonService } from '../core/back-button.service';
 
 @Component({
   selector: 'app-root',
@@ -18,14 +20,28 @@ export class AppComponent implements OnInit, OnDestroy {
   mostrarModalPWA = false;
   mostrarModalNotif = false;
   mostrarModalNotifNegada = false;
+  mostrarModalSair = false;
+  mostrarModalFecharApp = false;
+
+  private backSubscription: any;
 
   constructor(
     public auth: AuthService,
     private router: Router,
     private gameReminder: GameReminderService,
     private notifPermission: NotificationPermissionService,
-    public device: DeviceService
+    public device: DeviceService,
+    public pwaService: PwaInstallService,
+    private backButton: BackButtonService
   ) {}
+
+  /**
+   * ✅ Instalar PWA
+   */
+  instalarPWA() {
+    this.pwaService.instalar();
+    this.fecharModalPWA();
+  }
 
   ngOnInit() {
     if (this.auth.logado) {
@@ -49,6 +65,13 @@ export class AppComponent implements OnInit, OnDestroy {
           this.verificarModalPWA();
           sessionStorage.setItem('verificou_modal_pwa', 'true');
         }, 2000);
+      }
+
+      // ✅ APENAS mobile: detectar double tap para fechar app
+      if (this.device.isMobile()) {
+        this.backSubscription = this.backButton.doubleTapSair$.subscribe(() => {
+          this.verificarFecharApp();
+        });
       }
     }
   }
@@ -90,14 +113,6 @@ export class AppComponent implements OnInit, OnDestroy {
   fecharModalPWA() {
     this.mostrarModalPWA = false;
     sessionStorage.setItem('fechou_modal_pwa', 'true');
-  }
-
-  /**
-   * ✅ Mostra instruções PWA
-   */
-  mostrarInstrucoesPWA() {
-    console.log('📲 Abrindo instruções de como instalar PWA');
-    alert('📱 iPhone/iPad: Toque em Compartilhar → Adicionar à Tela de Início\n\n📱 Android: Toque no menu (⋮) → Instalar aplicativo');
   }
 
   /**
@@ -147,6 +162,7 @@ export class AppComponent implements OnInit, OnDestroy {
 
   ngOnDestroy() {
     this.gameReminder.stop();
+    this.backSubscription?.unsubscribe();
   }
 
   /**
@@ -197,18 +213,82 @@ export class AppComponent implements OnInit, OnDestroy {
   }
 
   /**
-   * ✅ Sair (desktop)
+   * ✅ EXECUTAR logout de verdade
    */
-  sair() {
-    if (confirm('Tem certeza que deseja sair?')) {
-      this.gameReminder.reset();
-      this.auth.logout();
-      this.router.navigate(['/entrar']);
-    }
+  private executarSaida() {
+    this.gameReminder.reset();
+    this.auth.logout();
+    this.router.navigate(['/entrar']);
   }
 
   /**
-   * ✅ Sair (mobile)
+   * ✅ Pergunta se quer FECHAR o APP (double tap no voltar - MOBILE ONLY)
+   */
+  private verificarFecharApp() {
+    const temModalAberto = this.mostrarModalPWA ||
+      this.mostrarModalNotif ||
+      this.mostrarModalNotifNegada ||
+      this.mostrarModalSair ||
+      this.mostrarModalFecharApp;
+
+    if (temModalAberto) {
+      console.log('⚠️ Modal já aberto');
+      return;
+    }
+
+    this.mostrarModalFecharApp = true;
+    console.log('❓ Perguntando se quer fechar o app (mobile)');
+  }
+
+  /**
+   * ✅ Confirmar fechar APP (sem logout)
+   */
+  confirmarFecharApp() {
+    this.mostrarModalFecharApp = false;
+    // Apenas volta para trás (sai do app)
+    history.back();
+  }
+
+  /**
+   * ✅ Cancelar fechar APP
+   */
+  cancelarFecharApp() {
+    this.mostrarModalFecharApp = false;
+  }
+
+  /**
+   * ✅ Confirmar saída (logout)
+   */
+  confirmarSaida() {
+    this.mostrarModalSair = false;
+    this.executarSaida();
+  }
+
+  /**
+   * ✅ Cancelar saída
+   */
+  cancelarSaida() {
+    this.mostrarModalSair = false;
+  }
+
+  /**
+   * ✅ Sair (botão navbar) - DESKTOP E MOBILE (logout)
+   */
+  sair() {
+    const temModalAberto = this.mostrarModalPWA ||
+      this.mostrarModalNotif ||
+      this.mostrarModalNotifNegada;
+
+    if (temModalAberto) {
+      console.log('⚠️ Modal já aberto');
+      return;
+    }
+
+    this.mostrarModalSair = true;
+  }
+
+  /**
+   * ✅ Sair (mobile navbar) - MOBILE ONLY
    */
   sairMobile() {
     this.fecharMenu();
