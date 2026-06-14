@@ -5,6 +5,7 @@ import { AuthService } from '../core/auth.service';
 import { GameReminderService } from '../core/game-reminder.service';
 import { NotificationPermissionService } from '../core/notification.permission.service';
 import { DeviceService } from '../core/device.service';
+import { PwaInstallService } from '../core/pwa-install.service';
 
 @Component({
   selector: 'app-root',
@@ -24,8 +25,17 @@ export class AppComponent implements OnInit, OnDestroy {
     private router: Router,
     private gameReminder: GameReminderService,
     private notifPermission: NotificationPermissionService,
-    public device: DeviceService
+    public device: DeviceService,
+    public pwaService: PwaInstallService
   ) {}
+
+  /**
+   * ✅ Instalar PWA
+   */
+  instalarPWA() {
+    this.pwaService.instalar();
+    this.fecharModalPWA();
+  }
 
   ngOnInit() {
     if (this.auth.logado) {
@@ -90,14 +100,6 @@ export class AppComponent implements OnInit, OnDestroy {
   fecharModalPWA() {
     this.mostrarModalPWA = false;
     sessionStorage.setItem('fechou_modal_pwa', 'true');
-  }
-
-  /**
-   * ✅ Mostra instruções PWA
-   */
-  mostrarInstrucoesPWA() {
-    console.log('📲 Abrindo instruções de como instalar PWA');
-    alert('📱 iPhone/iPad: Toque em Compartilhar → Adicionar à Tela de Início\n\n📱 Android: Toque no menu (⋮) → Instalar aplicativo');
   }
 
   /**

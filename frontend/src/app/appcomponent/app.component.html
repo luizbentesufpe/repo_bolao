@@ -75,43 +75,31 @@
       }
     }
 
-    <!-- ✅ MODAL PWA (mobile) -->
-    @if (mostrarModalPWA) {
-      <div style="position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 1000;">
-        <div style="background: white; padding: 24px; border-radius: 12px; max-width: 400px; box-shadow: 0 20px 60px rgba(0,0,0,0.3); margin: 16px;">
-          <h2 style="font-size: 20px; font-weight: 700; margin-bottom: 12px; color: var(--tinta);">
-            📱 Instalar Bolão?
-          </h2>
-          <p style="color: var(--tinta-fraca); margin-bottom: 20px; line-height: 1.6;">
-            Acesse o Bolão da Copa 2026 direto da tela inicial do seu celular! Funciona offline e é muito mais rápido.
-          </p>
-
-          <div style="background: #f5f5f5; padding: 12px; border-radius: 6px; margin-bottom: 16px; font-size: 13px; color: #666; line-height: 1.6;">
-            <strong>📲 Como instalar:</strong><br>
-            <br>
-            <strong>iPhone/iPad:</strong><br>
-            Toque em Compartilhar → Adicionar à Tela de Início
-            <br><br>
-            <strong>Android:</strong><br>
-            Toque no menu (⋮) → Instalar aplicativo
-          </div>
-
-          <div style="display: flex; gap: 12px;">
-            <button
-              (click)="fecharModalPWA()"
-              style="flex: 1; padding: 12px; background: #f0f0f0; border: none; border-radius: 6px; font-weight: 700; cursor: pointer; color: #666;">
-              Depois
-            </button>
-            <button
-              (click)="mostrarInstrucoesPWA()"
-              style="flex: 1; padding: 12px; background: var(--campo); color: white; border: none; border-radius: 6px; font-weight: 700; cursor: pointer;">
-              ℹ️ Ver como
-            </button>
-          </div>
-        </div>
+<!-- ✅ MODAL PWA (mobile) -->
+@if (mostrarModalPWA) {
+  <div style="position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 1000;">
+    <div style="background: white; padding: 24px; border-radius: 12px; max-width: 400px; box-shadow: 0 20px 60px rgba(0,0,0,0.3); margin: 16px;">
+      <h2 style="font-size: 20px; font-weight: 700; margin-bottom: 12px; color: var(--tinta);">
+        📱 Instalar Bolão?
+      </h2>
+      <p style="color: var(--tinta-fraca); margin-bottom: 20px; line-height: 1.6;">
+        Acesse o Bolão da Copa 2026 direto da tela inicial do seu celular! Funciona offline e é muito mais rápido.
+      </p>
+      <div style="display: flex; gap: 12px;">
+        <button
+          (click)="fecharModalPWA()"
+          style="flex: 1; padding: 12px; background: #f0f0f0; border: none; border-radius: 6px; font-weight: 700; cursor: pointer; color: #666;">
+          Depois
+        </button>
+        <button
+          (click)="instalarPWA()"
+          style="flex: 1; padding: 12px; background: var(--campo); color: white; border: none; border-radius: 6px; font-weight: 700; cursor: pointer;">
+          ⚡ Instalar
+        </button>
       </div>
-    }
-
+    </div>
+  </div>
+}
     <!-- ✅ MODAL NOTIFICAÇÕES -->
     @if (mostrarModalNotif) {
       <div style="position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 1000;">
