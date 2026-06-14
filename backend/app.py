@@ -18,6 +18,7 @@ import json
 import os
 from datetime import datetime, timedelta
 
+from apscheduler.schedulers.background import BackgroundScheduler
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 from flask_jwt_extended import (
@@ -26,8 +27,7 @@ from flask_jwt_extended import (
     get_jwt_identity,
     jwt_required,
 )
-from apscheduler.schedulers.background import BackgroundScheduler
-from models import Aposta, Jogo, User, db, NotificationSubscription
+from models import Aposta, Jogo, NotificationSubscription, User, db
 from pywebpush import WebPushException, webpush
 from sync_knockout import seed_knockout_matches
 
@@ -93,14 +93,16 @@ def enviar_push(subscription, titulo, mensagem, opcoes=None):
     vapid_private_key = os.getenv("VAPID_PRIVATE_KEY")
     frontend_url = os.getenv("FRONTEND_URL", "")
     vapid_claims = {"sub": "mailto:seu-email@example.com"}
-    
+
     payload = {
         "title": titulo,
         "body": mensagem,
         "icon": f"{frontend_url}/assets/icon-192.png",
         "badge": f"{frontend_url}/assets/icon-192.png",
         "tag": opcoes.get("tag", "notificacao") if opcoes else "notificacao",
-        "requireInteraction": opcoes.get("requireInteraction", False) if opcoes else False,
+        "requireInteraction": opcoes.get("requireInteraction", False)
+        if opcoes
+        else False,
         **(opcoes or {}),
     }
 
@@ -133,50 +135,56 @@ def verificar_jogos_proximos():
     Roda a cada 5 minutos em background
     """
     try:
-        print(f"[{datetime.now().strftime('%H:%M:%S')}] 🔔 Verificando jogos próximos...")
-        
+        print(
+            f"[{datetime.now().strftime('%H:%M:%S')}] 🔔 Verificando jogos próximos..."
+        )
+
         with app.app_context():
             agora = datetime.now()
-            
+
             # Jogos que começam em ~30 minutos
             jogo_30min = Jogo.query.filter(
                 Jogo.data_hora > agora + timedelta(minutes=25),
                 Jogo.data_hora < agora + timedelta(minutes=35),
                 Jogo.status_api == "TIMED",
-                Jogo.gols_time1.is_(None), 
+                Jogo.gols_time1.is_(None),
             ).first()
-            
+
             # Jogos que começam em ~10 minutos
             jogo_10min = Jogo.query.filter(
                 Jogo.data_hora > agora + timedelta(minutes=5),
                 Jogo.data_hora < agora + timedelta(minutes=15),
                 Jogo.status_api == "TIMED",
-                Jogo.gols_time1.is_(None), 
+                Jogo.gols_time1.is_(None),
             ).first()
-            
+
             # Obter todas as subscriptions
             subs = NotificationSubscription.query.all()
-            
+
             # Enviar notificações para jogo em 30 minutos
             if jogo_30min and subs:
-                print(f"⏰ Enviando lembretes (30min): {jogo_30min.time1.nome} vs {jogo_30min.time2.nome}")
+                print(
+                    f"⏰ Enviando lembretes (30min): {jogo_30min.time1.nome} vs {jogo_30min.time2.nome}"
+                )
                 for sub in subs:
                     enviar_push(
                         sub,
                         f"⏰ {jogo_30min.time1.nome} vs {jogo_30min.time2.nome}",
                         "Faltam 30 minutos! Não esqueça sua aposta!",
-                        {"tag": "lembrete-30min", "requireInteraction": True}
+                        {"tag": "lembrete-30min", "requireInteraction": True},
                     )
-            
+
             # Enviar notificações para jogo em 10 minutos
             if jogo_10min and subs:
-                print(f"⚽ Enviando lembretes (10min): {jogo_10min.time1.nome} vs {jogo_10min.time2.nome}")
+                print(
+                    f"⚽ Enviando lembretes (10min): {jogo_10min.time1.nome} vs {jogo_10min.time2.nome}"
+                )
                 for sub in subs:
                     enviar_push(
                         sub,
                         f"⚽ {jogo_10min.time1.nome} vs {jogo_10min.time2.nome}",
                         "COMEÇANDO EM 10 MINUTOS! Confira sua aposta!",
-                        {"tag": "lembrete-10min", "requireInteraction": True}
+                        {"tag": "lembrete-10min", "requireInteraction": True},
                     )
     except Exception as e:
         print(f"❌ Erro ao verificar jogos próximos: {e}")
@@ -831,71 +839,73 @@ def scheduler_test_simulate():
     - Retorna resultado
     """
     try:
-        print("\n" + "="*60)
+        print("\n" + "=" * 60)
         print("🧪 INICIANDO TESTE DO SCHEDULER")
-        print("="*60)
-        
-        from models import Time
-        
-        # Criar tempos fake se não existirem
+        print("=" * 60)
+
+        from models import Campeonato, Time
+
         time1 = Time.query.first()
         time2 = Time.query.filter(Time.id != time1.id).first()
-        
-        if not time1 or not time2:
-            return resposta_sem_cache({
-                "ok": False,
-                "msg": "Erro: precisa ter pelo menos 2 times no banco"
-            }), 400
-        
+        campeonato = Campeonato.query.first()  # ✅ Pegar um campeonato
+
+        if not time1 or not time2 or not campeonato:
+            return resposta_sem_cache(
+                {"ok": False, "msg": "Erro: faltam times ou campeonato no banco"}
+            ), 400
+
         # Criar jogo que começa em 30 minutos
         agora = datetime.now()
         data_jogo_30min = agora + timedelta(minutes=28)
-        
+
         jogo_fake = Jogo(
+            campeonato_id=campeonato.id,
             time1_id=time1.id,
             time2_id=time2.id,
             data_hora=data_jogo_30min,
             estadio="🧪 SIMULADO",
-            status_api="TIMED" 
+            status_api="TIMED",
         )
         db.session.add(jogo_fake)
         db.session.commit()
-        
+
         print(f"✅ Jogo simulado criado: ID {jogo_fake.id}")
         print(f"   Time 1: {time1.nome}")
         print(f"   Time 2: {time2.nome}")
         print(f"   Começa em: {jogo_fake.data_hora.strftime('%H:%M:%S')}")
-        print(f"   Diferença: 28 minutos (vai disparar notificação de 30min)")
-        
+        print("   Diferença: 28 minutos (vai disparar notificação de 30min)")
+
         # Executar a função do scheduler manualmente
         print("\n🔔 Executando verificar_jogos_proximos()...")
         verificar_jogos_proximos()
-        
+
         # Deletar jogo fake
         db.session.delete(jogo_fake)
         db.session.commit()
-        
-        print(f"✅ Jogo simulado deletado")
-        print("="*60)
-        
-        return resposta_sem_cache({
-            "ok": True,
-            "msg": "✅ Teste do scheduler executado com sucesso!",
-            "detalhes": {
-                "jogo_criado": f"{time1.nome} vs {time2.nome}",
-                "horario": data_jogo_30min.strftime('%H:%M:%S'),
-                "scheduler_status": "running" if scheduler.running else "stopped"
+
+        print("✅ Jogo simulado deletado")
+        print("=" * 60)
+
+        return resposta_sem_cache(
+            {
+                "ok": True,
+                "msg": "✅ Teste do scheduler executado com sucesso!",
+                "detalhes": {
+                    "jogo_criado": f"{time1.nome} vs {time2.nome}",
+                    "horario": data_jogo_30min.strftime("%H:%M:%S"),
+                    "scheduler_status": "running" if scheduler.running else "stopped",
+                },
             }
-        }), 200
-        
+        ), 200
+
     except Exception as e:
         print(f"❌ Erro no teste: {e}")
         import traceback
+
         traceback.print_exc()
-        return resposta_sem_cache({
-            "ok": False,
-            "msg": f"Erro ao simular: {str(e)}"
-        }), 500
+        return resposta_sem_cache(
+            {"ok": False, "msg": f"Erro ao simular: {str(e)}"}
+        ), 500
 
 
 @app.get("/api/scheduler/status")
@@ -904,21 +914,27 @@ def scheduler_status():
     🔍 Verificar status do APScheduler
     """
     jobs = scheduler.get_jobs()
-    
-    return resposta_sem_cache({
-        "ok": True,
-        "scheduler_running": scheduler.running,
-        "total_jobs": len(jobs),
-        "jobs": [
-            {
-                "id": job.id,
-                "name": job.name,
-                "trigger": str(job.trigger),
-                "next_run_time": job.next_run_time.isoformat() if job.next_run_time else None
-            }
-            for job in jobs
-        ]
-    }), 200
+
+    return resposta_sem_cache(
+        {
+            "ok": True,
+            "scheduler_running": scheduler.running,
+            "total_jobs": len(jobs),
+            "jobs": [
+                {
+                    "id": job.id,
+                    "name": job.name,
+                    "trigger": str(job.trigger),
+                    "next_run_time": job.next_run_time.isoformat()
+                    if job.next_run_time
+                    else None,
+                }
+                for job in jobs
+            ],
+        }
+    ), 200
+
+
 @app.before_request
 def antes_requisicao():
     """Inicializa scheduler na primeira requisição"""
