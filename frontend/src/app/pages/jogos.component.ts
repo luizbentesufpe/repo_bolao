@@ -357,7 +357,7 @@ export class JogosComponent implements OnInit, OnDestroy {
   private intervaloAtualizacao: any;
 
   constructor(private api: ApiService, private sincronizacaoService: SincronizacaoService,
-    private auth: AuthService, private notifPermission: NotificationPermissionService
+    public auth: AuthService, private notifPermission: NotificationPermissionService
   ) { }
 
   ngOnInit() {
