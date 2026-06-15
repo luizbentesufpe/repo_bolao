@@ -13,7 +13,7 @@ import { SincronizacaoService } from '../core/sincronizacao.service';
   standalone: true,
   imports: [DatePipe, CommonModule, FormsModule, BandeiraPipe],
   template: `
-    <main class="conteudo">
+<main class="conteudo">
     <!-- ✅ BOTÃO ATIVAR NOTIFICAÇÕES -->
      @if (!notificacoesAtivadas && auth.logado) {
        <div style="padding: 0 0 20px 0;">
@@ -139,6 +139,8 @@ import { SincronizacaoService } from '../core/sincronizacao.service';
                   </div>
                 </div>
               }
+            </article>
+          }
         }
 
         <!-- JOGOS ENCERRADOS (CORTINA) -->
@@ -188,7 +190,7 @@ import { SincronizacaoService } from '../core/sincronizacao.service';
         }
       }
     </main>
-  `,
+  `,  
   styles: [`
   .cortina-encerrados {
     margin: 20px 0;
