@@ -368,6 +368,9 @@ def listar_jogos():
     for jogo in query.all():
         if jogo.encerrado:
             recalcular_pontos_jogo(jogo)
+        elif jogo.ao_vivo:
+            for aposta in Aposta.query.filter_by(jogo_id=jogo.id).all():
+                aposta.pontos = 0
 
         d = jogo.to_dict()
         aposta = minhas.get(jogo.id)
@@ -520,7 +523,9 @@ def ranking():
     jogos_concluidos_ids = set(
         j.id
         for j in Jogo.query.filter(
-            Jogo.gols_time1.isnot(None), Jogo.gols_time2.isnot(None)
+            Jogo.gols_time1.isnot(None),
+            Jogo.gols_time2.isnot(None),
+            Jogo.status_api == 'FINISHED'
         ).all()
     )
 
