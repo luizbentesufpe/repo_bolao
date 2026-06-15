@@ -380,6 +380,7 @@ def listar_jogos():
     return resposta_sem_cache(saida)
 
 
+
 # ================================================================ JOGOS - ENDPOINT 2: SINCRONIZAR (BACKGROUND)
 @app.post("/api/sincronizar")
 @jwt_required(optional=True)
@@ -388,20 +389,29 @@ def sincronizar():
     ✅ ENDPOINT 2: Sincroniza com API football-data.org (BACKGROUND)
     Tempo: 5-10s (mas não bloqueia frontend)
     Cache: ✅ COM cache 5 minutos (não sobrecarrega API externa)
+    Cache reduzido para 1 minuto se houver jogo ao vivo
     """
     global ultimo_sync
     global ultimo_sync_timestamp
     from sync_resultados import sincronizar_resultados
+    from models import Jogo
 
     agora = datetime.now()
 
-    # ✅ Sincroniza APENAS se passou 5 minutos
+    # ✅ Verifica se há jogo ao vivo para reduzir cache para 1 minuto
+    tem_jogo_ao_vivo = Jogo.query.filter(
+        Jogo.status_api.in_(["IN_PLAY", "LIVE", "PAUSED"])
+    ).first() is not None
+
+    intervalo = 1 if tem_jogo_ao_vivo else INTERVALO_SYNC
+
+    # ✅ Sincroniza APENAS se passou o intervalo
     if (
         ultimo_sync is None
-        or (agora - ultimo_sync).total_seconds() > INTERVALO_SYNC * 60
+        or (agora - ultimo_sync).total_seconds() > intervalo * 60
     ):
         print(
-            f"[{agora.strftime('%H:%M:%S')}] 🔄 Sincronizando placares...", flush=True
+            f"[{agora.strftime('%H:%M:%S')}] 🔄 Sincronizando placares {'(jogo ao vivo!)' if tem_jogo_ao_vivo else ''}...", flush=True
         )
         sincronizar_resultados(app=app, verbose=False, status_filter=None)
         print(f"[{agora.strftime('%H:%M:%S')}] 🎯 Populando mata-mata...", flush=True)
@@ -418,7 +428,7 @@ def sincronizar():
             }
         ), 200
     else:
-        tempo_restante = INTERVALO_SYNC * 60 - (agora - ultimo_sync).total_seconds()
+        tempo_restante = intervalo * 60 - (agora - ultimo_sync).total_seconds()
         print(
             f"[{agora.strftime('%H:%M:%S')}] ⏳ Cache ativo (próximo sync em {int(tempo_restante)}s)",
             flush=True,
@@ -431,7 +441,6 @@ def sincronizar():
                 "proximaSincronizacao": int(tempo_restante),
             }
         ), 200
-
 
 # ================================================================ APOSTAS DO JOGO
 @app.get("/api/apostas-do-jogo/<int:jogo_id>")
