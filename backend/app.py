@@ -549,7 +549,7 @@ def ranking():
         item["apostas"] += 1
 
         # ✅ Se jogo foi concluído, contar também
-        if aposta.jogo_id in jogos_concluidos_ids:
+        if aposta.jogo_id in jogos_concluidos_ids and jogo.status_api == 'FINISHED':
             item["apostas_em_jogos_concluidos"] += 1
 
         if aposta.pontos is not None and aposta.pontos > 0:
@@ -564,6 +564,7 @@ def ranking():
         # ✅ Só contar exatos em jogos concluídos
         if (
             aposta.jogo_id in jogos_concluidos_ids
+            and jogo.status_api == 'FINISHED'
             and aposta.gols_time1 == jogo.gols_time1
             and aposta.gols_time2 == jogo.gols_time2
         ):
