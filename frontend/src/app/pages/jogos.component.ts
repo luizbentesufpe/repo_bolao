@@ -2,6 +2,8 @@ import { Component, OnInit, OnDestroy } from '@angular/core';
 import { DatePipe, CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ApiService } from '../core/api.service';
+import { NotificationPermissionService } from '../core/notification.permission.service';
+import { AuthService } from '../core/auth.service';
 import { Jogo } from '../core/models';
 import { BandeiraPipe } from '../core/bandeiras.pipe';
 import { SincronizacaoService } from '../core/sincronizacao.service';
@@ -12,6 +14,27 @@ import { SincronizacaoService } from '../core/sincronizacao.service';
   imports: [DatePipe, CommonModule, FormsModule, BandeiraPipe],
   template: `
     <main class="conteudo">
+    <!-- ✅ BOTÃO ATIVAR NOTIFICAÇÕES -->
+     @if (!notificacoesAtivadas && auth.logado) {
+       <div style="padding: 0 0 20px 0;">
+         <button
+           (click)="ativarNotificacoes()"
+           style="
+             width: 100%;
+             padding: 12px;
+             background: var(--campo);
+             color: white;
+             border: none;
+             border-radius: 8px;
+             font-weight: 700;
+             cursor: pointer;
+             font-size: 14px;
+           "
+         >
+           🔔 Ativar Notificações
+         </button>
+       </div>
+     }
       <h1 class="titulo-pagina">Jogos</h1>
       <p class="subtitulo">Confira as partidas do dia ou da semana, com placares e suas apostas.</p>
 
@@ -97,30 +120,25 @@ import { SincronizacaoService } from '../core/sincronizacao.service';
               <!-- MODAL DE APOSTA INLINE -->
               @if (jogoEmEdicao?.id === jogo.id) {
                 <div class="modal-aposta">
-                  <div class="modal-conteudo">
-                    <h3>Seu palpite</h3>
-                    <div style="display: grid; grid-template-columns: 1fr auto 1fr; gap: 10px; align-items: center; margin: 12px 0;">
-                      <input type="number" min="0" max="99" [(ngModel)]="palpite1" 
-                             placeholder="Gols" style="text-align: center; font-weight: 700;">
-                      <span style="font-weight: 700; font-size: 18px;">×</span>
-                      <input type="number" min="0" max="99" [(ngModel)]="palpite2" 
-                             placeholder="Gols" style="text-align: center; font-weight: 700;">
-                    </div>
-                    <div style="display: flex; gap: 8px; justify-content: flex-end;">
-                      <button class="btn" (click)="cancelarAposta()" style="background: #b9cdbe; font-size: 12px;">
-                        Cancelar
-                      </button>
-                      <button class="btn btn-amarelo" (click)="confirmarAposta(jogo)" 
-                              [disabled]="palpite1 === null || palpite2 === null" 
-                              style="font-size: 12px;">
-                        Confirmar
-                      </button>
-                    </div>
+                  <h3>Seu palpite</h3>
+                  <div class="palpite-container">
+                    <input type="number" min="0" max="99" [(ngModel)]="palpite1" 
+                          placeholder="Gols" class="input-palpite">
+                    <span class="x">×</span>
+                    <input type="number" min="0" max="99" [(ngModel)]="palpite2" 
+                          placeholder="Gols" class="input-palpite">
+                  </div>
+                  <div class="modal-botoes">
+                    <button class="btn btn-cancelar" (click)="cancelarAposta()">
+                      Cancelar
+                    </button>
+                    <button class="btn btn-amarelo" (click)="confirmarAposta(jogo)" 
+                            [disabled]="palpite1 === null || palpite2 === null">
+                      Confirmar
+                    </button>
                   </div>
                 </div>
               }
-            </article>
-          }
         }
 
         <!-- JOGOS ENCERRADOS (CORTINA) -->
@@ -172,99 +190,179 @@ import { SincronizacaoService } from '../core/sincronizacao.service';
     </main>
   `,
   styles: [`
-    .cortina-encerrados {
-      margin: 20px 0;
-      border-top: 2px dashed #ddd;
-      padding-top: 16px;
+  .cortina-encerrados {
+    margin: 20px 0;
+    border-top: 2px dashed #ddd;
+    padding-top: 16px;
+  }
+  .btn-cortina {
+    width: 100%;
+    padding: 12px 16px;
+    background: #f5f5f5;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    font-weight: 600;
+    color: #666;
+    cursor: pointer;
+    font-size: 14px;
+    transition: all 0.2s ease;
+  }
+  .btn-cortina:hover {
+    background: #eee;
+  }
+  .jogos-expandidos {
+    margin-top: 12px;
+    animation: expandDown 0.3s ease-out;
+  }
+  @keyframes expandDown {
+    from {
+      opacity: 0;
+      max-height: 0;
+      overflow: hidden;
     }
-    .btn-cortina {
-      width: 100%;
-      padding: 12px 16px;
-      background: #f5f5f5;
-      border: 1px solid #ddd;
-      border-radius: 8px;
-      font-weight: 600;
-      color: #666;
-      cursor: pointer;
-      font-size: 14px;
-      transition: all 0.2s ease;
+    to {
+      opacity: 1;
+      max-height: 5000px;
     }
-    .btn-cortina:hover {
-      background: #eee;
+  }
+  .jogo-card.encerrado {
+    opacity: 0.7;
+    background: #fafafa;
+  }
+  
+  /* ✅ MODAL DE APOSTA */
+  .modal-aposta {
+    grid-column: 1 / -1;
+    background: #fff8e1;
+    border: 2px solid var(--amarelo);
+    border-radius: 8px;
+    padding: 12px;
+    margin-top: 8px;
+    animation: slideIn 0.2s ease-out;
+  }
+
+  .modal-aposta h3 {
+    margin: 0 0 12px 0;
+    font-size: 14px;
+    color: var(--tinta);
+  }
+
+  .palpite-container {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 12px;
+  }
+
+  .input-palpite {
+    width: 70px;
+    height: 50px;
+    font-size: 24px;
+    font-weight: 700;
+    text-align: center;
+    border: 2px solid var(--linha);
+    border-radius: 8px;
+    padding: 4px;
+    font-family: 'IBM Plex Mono', monospace;
+  }
+
+  .input-palpite:focus {
+    border-color: var(--campo);
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(14, 122, 60, 0.1);
+  }
+
+  .palpite-container .x {
+    font-weight: 700;
+    font-size: 20px;
+    color: var(--tinta);
+  }
+
+  .modal-botoes {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+  }
+
+  .btn-cancelar {
+    background: #b9cdbe;
+    color: var(--tinta);
+    border: none;
+    padding: 10px 16px;
+    border-radius: 6px;
+    font-weight: 700;
+    cursor: pointer;
+    font-size: 12px;
+    transition: all 0.2s ease;
+  }
+
+  .btn-cancelar:hover {
+    opacity: 0.9;
+  }
+
+  .btn-amarelo {
+    background: var(--amarelo);
+    color: var(--tinta);
+    border: none;
+    padding: 10px 16px;
+    border-radius: 6px;
+    font-weight: 700;
+    cursor: pointer;
+    font-size: 12px;
+    transition: all 0.2s ease;
+  }
+
+  .btn-amarelo:hover:not(:disabled) {
+    opacity: 0.9;
+    transform: scale(1.05);
+  }
+
+  .btn-amarelo:disabled {
+    background: #ddd;
+    color: #999;
+    cursor: not-allowed;
+    opacity: 0.6;
+  }
+
+  @keyframes slideIn {
+    from { 
+      opacity: 0; 
+      transform: translateY(-10px); 
     }
-    .jogos-expandidos {
-      margin-top: 12px;
-      animation: expandDown 0.3s ease-out;
+    to { 
+      opacity: 1; 
+      transform: translateY(0); 
     }
-    @keyframes expandDown {
-      from {
-        opacity: 0;
-        max-height: 0;
-        overflow: hidden;
-      }
-      to {
-        opacity: 1;
-        max-height: 5000px;
-      }
-    }
-    .jogo-card.encerrado {
-      opacity: 0.7;
-      background: #fafafa;
-    }
-    .modal-aposta {
-      grid-column: 1 / -1;
-      background: #fff8e1;
-      border: 2px solid var(--amarelo);
-      border-radius: 8px;
-      padding: 12px;
-      margin-top: 8px;
-      animation: slideIn 0.2s ease-out;
-    }
-    .modal-conteudo h3 {
-      margin: 0 0 8px;
-      font-size: 14px;
-      color: var(--tinta);
-    }
-    .modal-aposta input {
-      width: 100%;
-      padding: 8px;
-      border: 1px solid var(--linha);
-      border-radius: 4px;
-      font-size: 16px;
-      font-family: 'IBM Plex Mono', monospace;
-    }
-    .modal-aposta input:focus {
-      border-color: var(--campo);
-      outline: none;
-    }
-    @keyframes slideIn {
-      from { opacity: 0; transform: translateY(-10px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
-  `]
+  }
+`]
 })
 export class JogosComponent implements OnInit, OnDestroy {
   periodo: 'hoje' | 'semana' | 'todos' = 'hoje';
-  dias: { 
-    chave: string; 
-    data: string; 
+  dias: {
+    chave: string;
+    data: string;
     jogosAtivos: Jogo[];
     jogosEncerrados: Jogo[];
     expandido: boolean;
   }[] = [];
   carregando = true;
-  
+  notificacoesAtivadas = false;
+
   jogoEmEdicao: Jogo | null = null;
   palpite1: number | null = null;
   palpite2: number | null = null;
   private intervaloAtualizacao: any;
 
-  constructor(private api: ApiService, private sincronizacaoService: SincronizacaoService) {}
-  
+  constructor(private api: ApiService, private sincronizacaoService: SincronizacaoService,
+    private auth: AuthService, private notifPermission: NotificationPermissionService
+  ) { }
+
   ngOnInit() {
     this.sincronizacaoService.sincronizar();
     this.filtrar('hoje');
-    
+    this.verificarStatusNotificacoes();
+
     // ✅ ATUALIZA CRONÔMETRO A CADA 1 SEGUNDO
     this.intervaloAtualizacao = setInterval(() => {
       this.dias = [...this.dias];
@@ -292,7 +390,7 @@ export class JogosComponent implements OnInit, OnDestroy {
       const semana00h = new Date(hoje00h.getTime() + 604800000);
 
       const mapa = new Map<string, { ativos: Jogo[], encerrados: Jogo[] }>();
-      
+
       for (const j of jogos) {
         const dataLocal = new Date(j.data_hora);
 
@@ -301,16 +399,16 @@ export class JogosComponent implements OnInit, OnDestroy {
 
         const chave = dataLocal.toLocaleDateString('pt-BR')
           .split('/').reverse().join('-');
-        
+
         if (!mapa.has(chave)) mapa.set(chave, { ativos: [], encerrados: [] });
-        
+
         if (j.encerrado) {
           mapa.get(chave)!.encerrados.push(j);
         } else {
           mapa.get(chave)!.ativos.push(j);
         }
       }
-      
+
       this.dias = [...mapa.entries()].map(([chave, { ativos, encerrados }]) => ({
         chave,
         data: [...ativos, ...encerrados][0].data_hora,
@@ -318,7 +416,7 @@ export class JogosComponent implements OnInit, OnDestroy {
         jogosEncerrados: encerrados,
         expandido: false
       }));
-      
+
       this.carregando = false;
     });
   }
@@ -364,16 +462,36 @@ export class JogosComponent implements OnInit, OnDestroy {
     this.palpite1 = null;
     this.palpite2 = null;
   }
+  // ✅ Verifica se notificações estão ativadas
+  verificarStatusNotificacoes() {
+    this.notifPermission.verificarStatusReal().then(status => {
+      this.notificacoesAtivadas = status.navegador === 'granted' && status.banco;
+    });
+  }
+
+  // ✅ Ativa notificações
+  ativarNotificacoes() {
+    this.notifPermission.solicitarPermissao().then(permissao => {
+      if (permissao === 'granted') {
+        this.notifPermission.testarNotificacao();
+        setTimeout(() => {
+          this.notifPermission.sincronizarNotificacoes().then(() => {
+            this.verificarStatusNotificacoes();
+          });
+        }, 500);
+      }
+    });
+  }
 
   confirmarAposta(jogo: Jogo) {
     if (this.palpite1 === null || this.palpite2 === null) return;
-    
+
     if (!this.estaAberto(jogo)) {
       alert('Apostas encerradas: o jogo já começou.');
       this.cancelarAposta();
       return;
     }
-    
+
     this.api.salvarAposta(jogo.id, this.palpite1, this.palpite2).subscribe({
       next: aposta => {
         jogo.minha_aposta = aposta;
