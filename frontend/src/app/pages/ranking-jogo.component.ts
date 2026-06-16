@@ -286,15 +286,21 @@ export class RankingJogoComponent implements OnInit, OnDestroy {
       switch (this.periodo) {
         case 'hoje':
           jogos = jogos.filter(j => {
-            const dataJogo = new Date(j.data_hora);
-            const diaJogo = new Date(dataJogo.getFullYear(), dataJogo.getMonth(), dataJogo.getDate());
+            const dataReal = new Date(j.data_hora);
+            const ehMeiaNoite = dataReal.getHours() === 0 && dataReal.getMinutes() === 0 && dataReal.getSeconds() === 0;
+            const dataChave = new Date(dataReal);
+            if (ehMeiaNoite) dataChave.setSeconds(-1);
+            const diaJogo = new Date(dataChave.getFullYear(), dataChave.getMonth(), dataChave.getDate());
             return diaJogo.getTime() === hoje.getTime();
           });
           break;
         case 'semana':
           jogos = jogos.filter(j => {
-            const dataJogo = new Date(j.data_hora);
-            return dataJogo >= hoje && dataJogo <= proximaSemana;
+            const dataReal = new Date(j.data_hora);
+            const ehMeiaNoite = dataReal.getHours() === 0 && dataReal.getMinutes() === 0 && dataReal.getSeconds() === 0;
+            const dataChave = new Date(dataReal);
+            if (ehMeiaNoite) dataChave.setSeconds(-1);
+            return dataChave >= hoje && dataChave <= proximaSemana;
           });
           break;
         default:
@@ -310,11 +316,14 @@ export class RankingJogoComponent implements OnInit, OnDestroy {
     const mapa = new Map<string, Jogo[]>();
     
     this.jogosFiltrados.forEach(jogo => {
-      const dataLocal = new Date(jogo.data_hora);
-      dataLocal.setSeconds(dataLocal.getSeconds() - 1);
+      const dataReal = new Date(jogo.data_hora);
+      const ehMeiaNoite = dataReal.getHours() === 0 && dataReal.getMinutes() === 0 && dataReal.getSeconds() === 0;
 
-      const chave = dataLocal.toLocaleDateString('pt-BR')
-        .split('/').reverse().join('-');
+      // Meia-noite aparece no dia anterior, sem duplicata
+      const dataChave = new Date(dataReal);
+      if (ehMeiaNoite) dataChave.setSeconds(-1);
+
+      const chave = dataChave.toLocaleDateString('pt-BR').split('/').reverse().join('-');
       
       if (!mapa.has(chave)) {
         mapa.set(chave, []);
@@ -358,4 +367,4 @@ export class RankingJogoComponent implements OnInit, OnDestroy {
       this.detalhe = detalhe;
     });
   }
-}
+} 

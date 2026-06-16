@@ -1,93 +1,111 @@
 import { Injectable } from '@angular/core';
+import { Jogo } from './models';
 
 @Injectable({
   providedIn: 'root'
 })
 export class CacheService {
-  private readonly CACHE_KEY = 'jogos_cache';
-  private readonly TIMESTAMP_KEY = 'jogos_cache_timestamp';
-  private readonly TTL_MINUTOS = 30; // ✅ Cache expira após 30 minutos
+  private cache = localStorage;
+  private TTL_CACHE = 30 * 60 * 1000; // 30 minutos
 
   /**
-   * ✅ SALVAR jogos no cache com timestamp
+   * ✅ SALVAR JOGOS COM TIMESTAMP
    */
-  salvarJogos(jogos: any[]): void {
+  salvarJogos(jogos: Jogo[]) {
     try {
-      localStorage.setItem(this.CACHE_KEY, JSON.stringify(jogos));
-      localStorage.setItem(this.TIMESTAMP_KEY, Date.now().toString());
-      console.log('💾 Jogos salvos em cache');
+      this.cache.setItem('jogos', JSON.stringify({
+        jogos,
+        timestamp: Date.now()
+      }));
+      console.log(`✅ Cache salvo: ${jogos.length} jogos`);
     } catch (e) {
       console.error('❌ Erro ao salvar cache:', e);
     }
   }
 
   /**
-   * ✅ OBTER jogos do cache
+   * ✅ OBTER JOGOS VÁLIDOS (< 30min)
    */
-  obterJogos(): any[] | null {
+  obterJogos(): Jogo[] {
+    if (!this.isCacheValido()) return [];
+    return this.obterJogosComFallback();
+  }
+
+  /**
+   * ✅ NOVO: OBTER JOGOS MESMO QUE EXPIRADOS
+   * (Para Cache Fallback - mostrar dados antigos enquanto sincroniza)
+   */
+  obterJogosComFallback(): Jogo[] {
+    const cached = this.cache.getItem('jogos');
+    
+    if (!cached) {
+      console.log('⚠️ Nenhum cache disponível');
+      return [];
+    }
+    
     try {
-      const cached = localStorage.getItem(this.CACHE_KEY);
-      return cached ? JSON.parse(cached) : null;
+      const data = JSON.parse(cached);
+      const jogos = data.jogos || [];
+      console.log(`📦 Obtendo cache: ${jogos.length} jogos (${this.obterIdadeCache()}min atrás)`);
+      return jogos;
     } catch (e) {
-      console.error('❌ Erro ao obter cache:', e);
-      return null;
+      console.error('❌ Erro ao parsear cache:', e);
+      return [];
     }
   }
 
   /**
-   * ✅ VERIFICAR se cache ainda é válido (TTL)
-   * @returns true se cache < 30min, false se > 30min
+   * ✅ VERIFICAR SE CACHE É VÁLIDO (< 30min)
    */
   isCacheValido(): boolean {
+    const cached = this.cache.getItem('jogos');
+    
+    if (!cached) {
+      console.log('⚠️ Cache não existe');
+      return false;
+    }
+
     try {
-      const timestamp = localStorage.getItem(this.TIMESTAMP_KEY);
+      const data = JSON.parse(cached);
+      const idade = Date.now() - (data.timestamp || 0);
+      const valido = idade < this.TTL_CACHE;
       
-      if (!timestamp) {
-        console.log('⚠️ Cache não tem timestamp');
-        return false;
+      if (valido) {
+        console.log(`✅ Cache válido (${Math.round(idade / 60000)}min atrás)`);
+      } else {
+        console.log(`⚠️ Cache expirado (${Math.round(idade / 60000)}min atrás)`);
       }
-
-      const agora = Date.now();
-      const tempoDecorrido = agora - parseInt(timestamp);
-      const minutosDecorridos = tempoDecorrido / (1000 * 60);
-      const ehValido = minutosDecorridos < this.TTL_MINUTOS;
-
-      console.log(`⏱️ Cache tem ${Math.round(minutosDecorridos)}min (TTL: ${this.TTL_MINUTOS}min) - ${ehValido ? '✅ Válido' : '❌ Expirado'}`);
       
-      return ehValido;
+      return valido;
     } catch (e) {
-      console.error('❌ Erro ao verificar TTL:', e);
+      console.error('❌ Erro ao verificar validade:', e);
       return false;
     }
   }
 
   /**
-   * ✅ OBTER idade do cache em minutos
+   * ✅ OBTER IDADE DO CACHE EM MINUTOS
    */
   obterIdadeCache(): number {
+    const cached = this.cache.getItem('jogos');
+    
+    if (!cached) return -1;
+
     try {
-      const timestamp = localStorage.getItem(this.TIMESTAMP_KEY);
-      
-      if (!timestamp) return -1;
-
-      const agora = Date.now();
-      const tempoDecorrido = agora - parseInt(timestamp);
-      const minutosDecorridos = Math.round(tempoDecorrido / (1000 * 60));
-
-      return minutosDecorridos;
-    } catch (e) {
-      console.error('❌ Erro ao obter idade do cache:', e);
+      const data = JSON.parse(cached);
+      const idade = Date.now() - (data.timestamp || 0);
+      return Math.round(idade / 60000); // em minutos
+    } catch {
       return -1;
     }
   }
 
   /**
-   * ✅ LIMPAR cache manualmente
+   * ✅ LIMPAR CACHE
    */
-  limparCache(): void {
+  limparCache() {
     try {
-      localStorage.removeItem(this.CACHE_KEY);
-      localStorage.removeItem(this.TIMESTAMP_KEY);
+      this.cache.removeItem('jogos');
       console.log('🗑️ Cache limpo');
     } catch (e) {
       console.error('❌ Erro ao limpar cache:', e);
@@ -95,19 +113,12 @@ export class CacheService {
   }
 
   /**
-   * ✅ VERIFICAR se deve sincronizar em background
-   * @returns true se cache expirou e deve sincronizar
+   * ✅ VERIFICAR SE DEVE SINCRONIZAR EM BACKGROUND
+   * (Se tem cache MAS expirou)
    */
   deveSincronizarEmBackground(): boolean {
-    const cacheValido = this.isCacheValido();
-    const temCache = this.obterJogos() !== null;
-
-    // Se tem cache MAS expirou → sincroniza em background
-    if (temCache && !cacheValido) {
-      console.log('🔄 Cache expirado → sincronizando em background');
-      return true;
-    }
-
-    return false;
+    const temCache = this.cache.getItem('jogos') !== null;
+    const valido = this.isCacheValido();
+    return temCache && !valido;
   }
 }
