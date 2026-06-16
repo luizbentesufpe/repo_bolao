@@ -5,6 +5,10 @@ import { ApiService } from '../core/api.service';
 import { Jogo } from '../core/models';
 import { BandeiraPipe } from '../core/bandeiras.pipe';
 import { SincronizacaoService } from '../core/sincronizacao.service';
+import { CacheService } from '../core/cache.service';
+import { ConnectionService } from '../core/connection.service';
+import { timeout, catchError } from 'rxjs/operators';
+import { of, Subscription } from 'rxjs';
 
 interface JogoComPalpite extends Jogo {
   palpite1: number | null;
@@ -21,6 +25,27 @@ interface JogoComPalpite extends Jogo {
   template: `
 <main class="conteudo">
 
+  <!-- ✅ AVISO SEM INTERNET -->
+  @if (!online) {
+    <div class="aviso-sem-internet">
+      <div class="aviso-conteudo">
+        <span class="aviso-icone">📡</span>
+        <div class="aviso-texto">
+          <strong>Sem conexão com a internet</strong>
+          <p>Você está usando dados em cache. Os dados serão sincronizados quando a conexão retornar.</p>
+        </div>
+        <button class="aviso-fechar" (click)="fecharAviso()">✕</button>
+      </div>
+    </div>
+  }
+
+  <!-- ✅ INDICADOR DE SINCRONIZAÇÃO -->
+  @if (sincronizando) {
+    <div style="padding: 8px 12px; background: #fff8e1; border-left: 4px solid var(--amarelo); margin-bottom: 16px; border-radius: 4px; font-size: 12px; color: #666;">
+      🔄 Atualizando dados em tempo real...
+    </div>
+  }
+
   <h1 class="titulo-pagina">Fazer bolão</h1>
 
   <p class="subtitulo">
@@ -32,28 +57,21 @@ interface JogoComPalpite extends Jogo {
   <div class="card-criterios">
     <h3 class="card-titulo">🏆 Critérios de pontuação</h3>
     <div class="grid-criterios">
-      <!-- Exato -->
       <div class="criterio">
         <div class="points">5</div>
         <div class="label">Placar exato</div>
         <div class="example">2×0 = 2×0 ✓</div>
       </div>
-
-      <!-- Vencedor -->
       <div class="criterio">
         <div class="points">2</div>
         <div class="label">Vencedor/Empate</div>
         <div class="example">3×1 = 2×1 ✓</div>
       </div>
-
-      <!-- Gols parcial -->
       <div class="criterio">
         <div class="points">1</div>
         <div class="label">Gols de uma equipe</div>
         <div class="example">2×0 = 2×1 ✓</div>
       </div>
-
-      <!-- Errou -->
       <div class="criterio errou">
         <div class="points">0</div>
         <div class="label">Resultado incorreto</div>
@@ -62,7 +80,7 @@ interface JogoComPalpite extends Jogo {
     </div>
   </div>
 
-  <!-- ✅ CARD DO PÉ FRIO (RESPONSIVO) -->
+  <!-- ✅ CARD DO PÉ FRIO -->
   <div class="card-pe-frio">
     <h3 class="card-titulo">🥶 O que é Pé Frio?</h3>
     <p class="card-descricao">
@@ -78,44 +96,45 @@ interface JogoComPalpite extends Jogo {
     </div>
   </div>
 
-  @if (carregando) {
-    <p class="vazio">Carregando jogos…</p>
-  } @else if (dias.length === 0) {
+  @if (carregando && dias.length === 0) {
+    <p class="vazio">⏳ Carregando jogos…</p>
+  } @else if (dias.length === 0 && jogosEncerrados.length === 0) {
     <p class="vazio">Nenhum jogo no momento.</p>
   }
 
+  <!-- JOGOS ABERTOS (agrupados por dia) -->
   @for (dia of dias; track dia.chave) {
-    <!-- JOGOS ABERTOS -->
     @if (dia.jogosAbertos.length > 0) {
       <div class="dia-grupo">
-        <span class="rotulo">{{ dia.data | date:'EEEE, d \\'de\\' MMMM' }}</span>
+        <span class="rotulo">{{ dia.data | date:"EEEE, d 'de' MMMM" }}</span>
       </div>
 
       @for (jogo of dia.jogosAbertos; track jogo.id) {
         <article class="jogo-card">
-          <!-- ✅ LAYOUT MOBILE: stack vertical -->
-          <div class="jogo-header">
-            <div class="jogo-time-mobile">
-              <img [src]="jogo.time1.nome | bandeira" [alt]="jogo.time1.nome" class="bandeira">
-              <span class="time-nome">{{ jogo.time1.nome }}</span>
-            </div>
-            <div class="jogo-time-mobile">
-              <span class="time-nome">{{ jogo.time2.nome }}</span>
-              <img [src]="jogo.time2.nome | bandeira" [alt]="jogo.time2.nome" class="bandeira">
-            </div>
-          </div>
 
-          <!-- PALPITE -->
-          <div class="palpite-container">
-            <input type="number" min="0" max="99" [(ngModel)]="jogo.palpite1" 
-                   [disabled]="!estaAberto(jogo)"
-                   [attr.aria-label]="'Gols de ' + jogo.time1.nome"
-                   class="input-palpite">
-            <span class="x">×</span>
-            <input type="number" min="0" max="99" [(ngModel)]="jogo.palpite2" 
-                   [disabled]="!estaAberto(jogo)"
-                   [attr.aria-label]="'Gols de ' + jogo.time2.nome"
-                   class="input-palpite">
+          <!-- ✅ CONFRONTO: bandeira + nome acima dos inputs -->
+          <div class="jogo-confronto">
+            <div class="jogo-time">
+              <img [src]="jogo.time1.nome | bandeira" [alt]="jogo.time1.nome" class="bandeira-card">
+              <span>{{ jogo.time1.nome }}</span>
+            </div>
+
+            <div class="palpite-container">
+              <input type="number" min="0" max="99" [(ngModel)]="jogo.palpite1"
+                     [disabled]="!estaAberto(jogo)"
+                     [attr.aria-label]="'Gols de ' + jogo.time1.nome"
+                     class="input-palpite">
+              <span class="x">×</span>
+              <input type="number" min="0" max="99" [(ngModel)]="jogo.palpite2"
+                     [disabled]="!estaAberto(jogo)"
+                     [attr.aria-label]="'Gols de ' + jogo.time2.nome"
+                     class="input-palpite">
+            </div>
+
+            <div class="jogo-time">
+              <img [src]="jogo.time2.nome | bandeira" [alt]="jogo.time2.nome" class="bandeira-card">
+              <span>{{ jogo.time2.nome }}</span>
+            </div>
           </div>
 
           <!-- INFORMAÇÕES DO JOGO -->
@@ -136,11 +155,11 @@ interface JogoComPalpite extends Jogo {
 
           <!-- STATUS E BOTÃO -->
           <div class="jogo-rodape">
-            @if (jogo.erro) { 
-              <span class="status-erro">{{ jogo.erro }}</span> 
+            @if (jogo.erro) {
+              <span class="status-erro">{{ jogo.erro }}</span>
             }
-            @if (jogo.salvo) { 
-              <span class="status-sucesso">✓ Salvo</span> 
+            @if (jogo.salvo) {
+              <span class="status-sucesso">✓ Salvo</span>
             }
             <button class="btn" (click)="salvar(jogo)"
                     [disabled]="!estaAberto(jogo) || jogo.salvando || jogo.palpite1 === null || jogo.palpite2 === null"
@@ -155,27 +174,24 @@ interface JogoComPalpite extends Jogo {
         </article>
       }
     }
+  }
 
-    <!-- JOGOS ENCERRADOS (CORTINA) -->
-    @if (dia.jogosEncerrados.length > 0) {
-      <div class="cortina-encerrados">
-        <button class="btn-cortina" (click)="dia.expandido = !dia.expandido">
-          {{ dia.expandido ? '▼' : '▶' }} 🏁 {{ dia.jogosEncerrados.length }} jogo(s) encerrado(s)
-        </button>
+  <!-- ✅ UMA ÚNICA CORTINA PARA TODOS OS ENCERRADOS -->
+  @if (jogosEncerrados.length > 0) {
+    <div class="cortina-encerrados">
+      <button class="btn-cortina" (click)="encerradosExpandido = !encerradosExpandido">
+        {{ encerradosExpandido ? '▼' : '▶' }} 🏁 {{ jogosEncerrados.length }} jogo(s) encerrado(s)
+      </button>
 
-        @if (dia.expandido) {
-          <div class="jogos-expandidos">
-            @for (jogo of dia.jogosEncerrados; track jogo.id) {
-              <article class="jogo-card encerrado">
-                <div class="jogo-header">
-                  <div class="jogo-time-mobile">
-                    <img [src]="jogo.time1.nome | bandeira" [alt]="jogo.time1.nome" class="bandeira">
-                    <span class="time-nome">{{ jogo.time1.nome }}</span>
-                  </div>
-                  <div class="jogo-time-mobile">
-                    <span class="time-nome">{{ jogo.time2.nome }}</span>
-                    <img [src]="jogo.time2.nome | bandeira" [alt]="jogo.time2.nome" class="bandeira">
-                  </div>
+      @if (encerradosExpandido) {
+        <div class="jogos-expandidos">
+          @for (jogo of jogosEncerrados; track jogo.id) {
+            <article class="jogo-card encerrado">
+
+              <div class="jogo-confronto">
+                <div class="jogo-time">
+                  <img [src]="jogo.time1.nome | bandeira" [alt]="jogo.time1.nome" class="bandeira-card">
+                  <span>{{ jogo.time1.nome }}</span>
                 </div>
 
                 <div class="placar-final">
@@ -184,29 +200,103 @@ interface JogoComPalpite extends Jogo {
                   <span class="digito">{{ jogo.gols_time2 }}</span>
                 </div>
 
-                <div class="jogo-info">
-                  <div class="info-row">
-                    <span class="info-label">⏰</span>
-                    <span>{{ jogo.data_hora | date:'HH:mm' }}</span>
-                  </div>
+                <div class="jogo-time">
+                  <img [src]="jogo.time2.nome | bandeira" [alt]="jogo.time2.nome" class="bandeira-card">
+                  <span>{{ jogo.time2.nome }}</span>
                 </div>
+              </div>
 
-                @if (jogo.minha_aposta && jogo.minha_aposta.gols_time1 !== null && jogo.minha_aposta.gols_time2 !== null) { 
-                  <div class="pontos-chip" [class.cheio]="jogo.minha_aposta.pontos > 0">
-                    {{ jogo.minha_aposta.gols_time1 }}×{{ jogo.minha_aposta.gols_time2 }}
-                    · {{ jogo.minha_aposta.pontos }} pts
-                  </div>
-                }
-              </article>
-            }
-          </div>
-        }
-      </div>
-    }
+              <div class="jogo-info">
+                <div class="info-row">
+                  <span class="info-label">⏰</span>
+                  <span>{{ jogo.data_hora | date:'EEEE, d MMM · HH:mm' }}</span>
+                </div>
+              </div>
+
+              @if (jogo.minha_aposta && jogo.minha_aposta.gols_time1 !== null && jogo.minha_aposta.gols_time2 !== null) {
+                <div class="pontos-chip" [class.cheio]="jogo.minha_aposta.pontos > 0">
+                  {{ jogo.minha_aposta.gols_time1 }}×{{ jogo.minha_aposta.gols_time2 }}
+                  · {{ jogo.minha_aposta.pontos }} pts
+                </div>
+              }
+            </article>
+          }
+        </div>
+      }
+    </div>
   }
 </main>
   `,
   styles: [`
+    /* ✅ AVISO SEM INTERNET */
+    .aviso-sem-internet {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      background: #ff6b6b;
+      color: white;
+      padding: 12px 16px;
+      z-index: 9999;
+      animation: slideDown 0.3s ease-out;
+    }
+
+    .aviso-conteudo {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      max-width: 800px;
+      margin: 0 auto;
+    }
+
+    .aviso-icone {
+      font-size: 24px;
+      flex-shrink: 0;
+    }
+
+    .aviso-texto {
+      flex: 1;
+      font-size: 13px;
+    }
+
+    .aviso-texto strong {
+      display: block;
+      margin-bottom: 2px;
+      font-size: 14px;
+    }
+
+    .aviso-texto p {
+      margin: 0;
+      opacity: 0.9;
+      line-height: 1.4;
+    }
+
+    .aviso-fechar {
+      background: none;
+      border: none;
+      color: white;
+      font-size: 20px;
+      cursor: pointer;
+      padding: 4px 8px;
+      flex-shrink: 0;
+      transition: opacity 0.2s;
+    }
+
+    .aviso-fechar:hover {
+      opacity: 0.8;
+    }
+
+    @keyframes slideDown {
+      from {
+        transform: translateY(-100%);
+        opacity: 0;
+      }
+      to {
+        transform: translateY(0);
+        opacity: 1;
+      }
+    }
+
     /* ✅ CARDS DE INFORMAÇÃO */
     .card-criterios,
     .card-pe-frio {
@@ -230,7 +320,6 @@ interface JogoComPalpite extends Jogo {
       font-size: 14px;
       text-transform: uppercase;
       color: var(--tinta);
-      margin-bottom: 12px;
       letter-spacing: 1px;
       font-weight: 700;
       margin: 0 0 12px 0;
@@ -296,21 +385,12 @@ interface JogoComPalpite extends Jogo {
       line-height: 1.6;
     }
 
-    .exemplo-item:last-child {
-      margin-bottom: 0;
-    }
+    .exemplo-item:last-child { margin-bottom: 0; }
 
-    .bom {
-      color: var(--campo);
-      font-weight: 700;
-    }
+    .bom { color: var(--campo); font-weight: 700; }
+    .ruim { color: #ff6b6b; font-weight: 700; }
 
-    .ruim {
-      color: #ff6b6b;
-      font-weight: 700;
-    }
-
-    /* ✅ JOGO CARD RESPONSIVO */
+    /* ✅ JOGO CARD */
     .jogo-card {
       background: white;
       border: 1px solid var(--linha);
@@ -327,56 +407,53 @@ interface JogoComPalpite extends Jogo {
       background: #fafafa;
     }
 
-    /* ✅ HEADER COM TIMES */
-    .jogo-header {
-      display: flex;
-      justify-content: space-between;
-      gap: 26px;
+    /* ✅ CONFRONTO */
+    .jogo-confronto {
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
       align-items: center;
-      padding: 8px 0;
+      gap: 8px;
     }
 
-    .jogo-time-mobile {
+    .jogo-time {
       display: flex;
+      flex-direction: column;
       align-items: center;
-      gap: 12px;
-      flex: 1;
+      gap: 6px;
       font-weight: 700;
-      font-size: 14px;
+      font-size: 13px;
       color: var(--tinta);
+      text-align: center;
+      word-break: break-word;
     }
 
-    .bandeira {
-      width: 32px;
-      height: 24px;
+    .bandeira-card {
+      width: 40px;
+      height: 28px;
+      object-fit: cover;
       border-radius: 2px;
-      flex-shrink: 0;
     }
 
-    .time-nome {
-      word-break: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-
-    /* ✅ PALPITE CONTAINER */
+    /* ✅ PALPITE */
     .palpite-container {
       display: flex;
-      gap: 12px;
+      gap: 8px;
       align-items: center;
       justify-content: center;
     }
 
     .input-palpite {
-      width: 70px;
+      width: 64px;
       height: 50px;
       font-size: 24px;
       font-weight: 700;
       text-align: center;
-      border: 2px solid var(--linha);
+      border: 2px solid #b2d8bf;
       border-radius: 8px;
       padding: 4px;
       font-family: 'IBM Plex Mono', monospace;
+      background: #e8f5ee;
+      color: var(--campo);
     }
 
     .input-palpite:focus {
@@ -388,12 +465,29 @@ interface JogoComPalpite extends Jogo {
     .input-palpite:disabled {
       background: #f0f0f0;
       color: #999;
+      border-color: var(--linha);
     }
 
-    .palpite-container .x {
+    .x {
       font-weight: 700;
       font-size: 20px;
-      color: var(--tinta);
+      color: var(--tinta-fraca);
+    }
+
+    /* ✅ PLACAR FINAL */
+    .placar-final {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    .digito {
+      font-size: 28px;
+      font-weight: 700;
+      color: var(--amarelo);
+      min-width: 36px;
+      text-align: center;
     }
 
     /* ✅ INFORMAÇÕES DO JOGO */
@@ -471,28 +565,7 @@ interface JogoComPalpite extends Jogo {
       opacity: 0.6;
     }
 
-    .btn.salvando {
-      opacity: 0.8;
-    }
-
-    /* ✅ PLACAR FINAL (ENCERRADO) */
-    .placar-final {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 12px;
-      padding: 12px;
-      background: #f9f9f9;
-      border-radius: 6px;
-    }
-
-    .digito {
-      font-size: 28px;
-      font-weight: 700;
-      color: var(--tinta);
-      min-width: 40px;
-      text-align: center;
-    }
+    .btn.salvando { opacity: 0.8; }
 
     /* ✅ PONTOS CHIP */
     .pontos-chip {
@@ -503,7 +576,6 @@ interface JogoComPalpite extends Jogo {
       border-radius: 20px;
       font-size: 12px;
       font-weight: 600;
-      margin-top: 8px;
     }
 
     .pontos-chip.cheio {
@@ -531,9 +603,7 @@ interface JogoComPalpite extends Jogo {
       transition: all 0.2s ease;
     }
 
-    .btn-cortina:hover {
-      background: #eee;
-    }
+    .btn-cortina:hover { background: #eee; }
 
     .jogos-expandidos {
       margin-top: 12px;
@@ -541,112 +611,30 @@ interface JogoComPalpite extends Jogo {
     }
 
     @keyframes expandDown {
-      from {
-        opacity: 0;
-        max-height: 0;
-        overflow: hidden;
-      }
-      to {
-        opacity: 1;
-        max-height: 5000px;
-      }
+      from { opacity: 0; max-height: 0; overflow: hidden; }
+      to { opacity: 1; max-height: 5000px; }
     }
 
     /* ✅ MOBILE */
     @media (max-width: 768px) {
-      .grid-criterios {
-        grid-template-columns: 1fr;
-      }
-
-      .jogo-card {
-        padding: 12px;
-        gap: 10px;
-      }
-
-      .input-palpite {
-        width: 60px;
-        height: 45px;
-        font-size: 20px;
-      }
-
-      .jogo-info {
-        padding: 8px;
-        gap: 6px;
-        font-size: 11px;
-      }
-
-      .btn {
-        padding: 10px 12px;
-        font-size: 11px;
-      }
-
-      .card-criterios,
-      .card-pe-frio {
-        padding: 12px;
-      }
-
-      .card-titulo {
-        font-size: 13px;
-        margin-bottom: 10px;
-      }
-
-      .card-descricao {
-        font-size: 12px;
-        margin-bottom: 10px;
-      }
+      .grid-criterios { grid-template-columns: 1fr; }
+      .jogo-card { padding: 12px; gap: 10px; }
+      .input-palpite { width: 56px; height: 44px; font-size: 20px; }
+      .jogo-info { padding: 8px; gap: 6px; font-size: 11px; }
+      .btn { padding: 10px 12px; font-size: 11px; }
+      .card-criterios, .card-pe-frio { padding: 12px; }
     }
 
     /* ✅ EXTRA SMALL */
     @media (max-width: 480px) {
-      .grid-criterios {
-        grid-template-columns: 1fr;
-      }
-
-      .jogo-time-mobile {
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        flex: 0 1 auto;  /* ← Mudado para não expandir demais */
-        font-weight: 700;
-        font-size: 12px;
-        color: var(--tinta);
-        white-space: nowrap;  /* ← Impede quebra de linha */
-        overflow: hidden;
-        text-overflow: ellipsis;  /* Adiciona "..." se ficar muito longo */
-      }
-
-      .bandeira {
-        width: 28px;
-        height: 21px;
-      }
-
-      .input-palpite {
-        width: 50px;
-        height: 40px;
-        font-size: 18px;
-      }
-
-      .palpite-container .x {
-        font-size: 18px;
-      }
-
-      .jogo-rodape {
-        flex-direction: column;
-        align-items: stretch;
-      }
-
-      .status-erro,
-      .status-sucesso {
-        text-align: center;
-      }
-
-      .btn {
-        width: 100%;
-      }
-
-      .criterio .points {
-        font-size: 18px;
-      }
+      .jogo-time { font-size: 11px; }
+      .bandeira-card { width: 32px; height: 22px; }
+      .input-palpite { width: 48px; height: 40px; font-size: 18px; }
+      .digito { font-size: 22px; min-width: 28px; }
+      .jogo-rodape { flex-direction: column; align-items: stretch; }
+      .status-erro, .status-sucesso { text-align: center; }
+      .btn { width: 100%; }
+      .criterio .points { font-size: 18px; }
     }
   `]
 })
@@ -655,57 +643,105 @@ export class BolaoComponent implements OnInit, OnDestroy {
     chave: string;
     data: string;
     jogosAbertos: JogoComPalpite[];
-    jogosEncerrados: JogoComPalpite[];
-    expandido: boolean;
   }[] = [];
-  carregando = true;
 
-  constructor(private api: ApiService, private sincronizacaoService: SincronizacaoService) { }
+  jogosEncerrados: JogoComPalpite[] = [];
+  encerradosExpandido = false;
+
+  carregando = false;
+  sincronizando = false;
+  online = true;
+
+  private connectionSubscription: Subscription | null = null;
+  private avisoDismissed = false;
+
+  constructor(
+    private api: ApiService,
+    private sincronizacaoService: SincronizacaoService,
+    private cache: CacheService,
+    private connection: ConnectionService
+  ) {}
 
   ngOnInit() {
-    this.sincronizacaoService.sincronizar();
-    this.carregarJogos();
+    this.carregarDoCache();
+    this.sincronizarEmBackground();
+
+    this.connectionSubscription = this.connection.getStatus().subscribe((status: boolean) => {
+      this.online = status;
+      this.avisoDismissed = false;
+    });
   }
 
-  ngOnDestroy() { }
+  ngOnDestroy() {
+    if (this.connectionSubscription) {
+      this.connectionSubscription.unsubscribe();
+    }
+  }
 
-  private carregarJogos() {
-    this.api.jogos('todos').subscribe(jogos => {
-      const jogosFiltrados = jogos.map(j => ({
-        ...j,
-        palpite1: j.minha_aposta?.gols_time1 ?? null,
-        palpite2: j.minha_aposta?.gols_time2 ?? null,
-        salvando: false,
-        salvo: false,
-        erro: '',
-      }));
+  private carregarDoCache() {
+    const jogosCached = this.cache.obterJogos();
+    if (jogosCached && jogosCached.length > 0) {
+      this.processarJogos(jogosCached);
+    }
+  }
 
-      const mapa = new Map<string, { abertos: JogoComPalpite[], encerrados: JogoComPalpite[] }>();
+  private sincronizarEmBackground() {
+    this.sincronizando = true;
+    this.sincronizacaoService.sincronizar();
+    this.carregarJogosEmBackground();
+    setTimeout(() => {
+      this.sincronizando = false;
+    }, 2000);
+  }
 
-      for (const j of jogosFiltrados) {
-        const dataLocal = new Date(j.data_hora);
-        const chave = dataLocal.toLocaleDateString('pt-BR')
-          .split('/').reverse().join('-');
-
-        if (!mapa.has(chave)) mapa.set(chave, { abertos: [], encerrados: [] });
-
-        if (j.encerrado) {
-          mapa.get(chave)!.encerrados.push(j);
-        } else {
-          mapa.get(chave)!.abertos.push(j);
-        }
+  private carregarJogosEmBackground() {
+    this.api.jogos('todos').pipe(
+      timeout(15000),
+      catchError((error: any) => {
+        console.error('Erro ao carregar jogos:', error);
+        return of([]);
+      })
+    ).subscribe((jogos: Jogo[]) => {
+      if (jogos && jogos.length > 0) {
+        this.cache.salvarJogos(jogos);
+        this.processarJogos(jogos);
       }
-
-      this.dias = [...mapa.entries()].map(([chave, { abertos, encerrados }]) => ({
-        chave,
-        data: [...abertos, ...encerrados][0].data_hora,
-        jogosAbertos: abertos,
-        jogosEncerrados: encerrados,
-        expandido: false
-      }));
-
-      this.carregando = false;
     });
+  }
+
+  private processarJogos(jogos: Jogo[]) {
+    const jogosFiltrados = jogos.map(j => ({
+      ...j,
+      data_hora: new Date(j.data_hora),
+      palpite1: j.minha_aposta?.gols_time1 ?? null,
+      palpite2: j.minha_aposta?.gols_time2 ?? null,
+      salvando: false,
+      salvo: false,
+      erro: '',
+    })) as unknown as JogoComPalpite[];
+
+    // Separa encerrados (lista única) dos abertos (agrupados por dia)
+    this.jogosEncerrados = jogosFiltrados.filter(j => j.encerrado);
+
+    const abertos = jogosFiltrados.filter(j => !j.encerrado);
+    const mapa = new Map<string, { abertos: JogoComPalpite[] }>();
+
+    for (const j of abertos) {
+      const dataReal = new Date(j.data_hora);
+      const ehMeiaNoite = dataReal.getHours() === 0 && dataReal.getMinutes() === 0 && dataReal.getSeconds() === 0;
+      const dataChave = new Date(dataReal);
+      if (ehMeiaNoite) dataChave.setSeconds(-1);
+
+      const chave = dataChave.toLocaleDateString('pt-BR').split('/').reverse().join('-');
+      if (!mapa.has(chave)) mapa.set(chave, { abertos: [] });
+      mapa.get(chave)!.abertos.push(j);
+    }
+
+    this.dias = [...mapa.entries()].map(([chave, { abertos }]) => ({
+      chave,
+      data: abertos[0].data_hora,
+      jogosAbertos: abertos,
+    }));
   }
 
   estaAberto(jogo: JogoComPalpite): boolean {
@@ -725,16 +761,20 @@ export class BolaoComponent implements OnInit, OnDestroy {
     jogo.erro = '';
 
     this.api.salvarAposta(jogo.id, jogo.palpite1!, jogo.palpite2!).subscribe({
-      next: aposta => {
+      next: (aposta: any) => {
         jogo.minha_aposta = aposta;
         jogo.salvando = false;
         jogo.salvo = true;
         setTimeout(() => (jogo.salvo = false), 3000);
       },
-      error: e => {
+      error: (e: any) => {
         jogo.erro = e.error?.erro || 'Falha ao salvar.';
         jogo.salvando = false;
       },
     });
+  }
+
+  fecharAviso() {
+    this.avisoDismissed = true;
   }
 }

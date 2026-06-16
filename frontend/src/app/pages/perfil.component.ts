@@ -1,9 +1,12 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { AuthService } from '../core/auth.service';
 import { Router } from '@angular/router';
 import { NotificationPermissionService } from '../core/notification.permission.service';
+import { ConnectionService } from '../core/connection.service';
+import { CacheService } from '../core/cache.service';
+import { Subscription } from 'rxjs';
 
 @Component({
   selector: 'app-perfil',
@@ -11,6 +14,27 @@ import { NotificationPermissionService } from '../core/notification.permission.s
   imports: [CommonModule, FormsModule],
   template: `
     <main class="conteudo">
+      <!-- ✅ AVISO SEM INTERNET -->
+      @if (!online) {
+        <div class="aviso-sem-internet">
+          <div class="aviso-conteudo">
+            <span class="aviso-icone">📡</span>
+            <div class="aviso-texto">
+              <strong>Sem conexão com a internet</strong>
+              <p>Você está usando dados em cache. Os dados serão sincronizados quando a conexão retornar.</p>
+            </div>
+            <button class="aviso-fechar" (click)="fecharAviso()">✕</button>
+          </div>
+        </div>
+      }
+
+      <!-- ✅ INDICADOR DE SINCRONIZAÇÃO -->
+      @if (sincronizando) {
+        <div style="padding: 8px 12px; background: #fff8e1; border-left: 4px solid var(--amarelo); margin-bottom: 16px; border-radius: 4px; font-size: 12px; color: #666;">
+          🔄 Atualizando dados em tempo real...
+        </div>
+      }
+
       <h1 class="titulo-pagina">👤 Meu Perfil</h1>
 
       @if (usuario) {
@@ -143,20 +167,96 @@ import { NotificationPermissionService } from '../core/notification.permission.s
       }
     </main>
   `,
-  styles: []
+  styles: [`
+    /* ✅ AVISO SEM INTERNET */
+    .aviso-sem-internet {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      background: #ff6b6b;
+      color: white;
+      padding: 12px 16px;
+      z-index: 9999;
+      animation: slideDown 0.3s ease-out;
+    }
+
+    .aviso-conteudo {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      max-width: 800px;
+      margin: 0 auto;
+    }
+
+    .aviso-icone {
+      font-size: 24px;
+      flex-shrink: 0;
+    }
+
+    .aviso-texto {
+      flex: 1;
+      font-size: 13px;
+    }
+
+    .aviso-texto strong {
+      display: block;
+      margin-bottom: 2px;
+      font-size: 14px;
+    }
+
+    .aviso-texto p {
+      margin: 0;
+      opacity: 0.9;
+      line-height: 1.4;
+    }
+
+    .aviso-fechar {
+      background: none;
+      border: none;
+      color: white;
+      font-size: 20px;
+      cursor: pointer;
+      padding: 4px 8px;
+      flex-shrink: 0;
+      transition: opacity 0.2s;
+    }
+
+    .aviso-fechar:hover {
+      opacity: 0.8;
+    }
+
+    @keyframes slideDown {
+      from {
+        transform: translateY(-100%);
+        opacity: 0;
+      }
+      to {
+        transform: translateY(0);
+        opacity: 1;
+      }
+    }
+  `]
 })
-export class PerfilComponent implements OnInit {
+export class PerfilComponent implements OnInit, OnDestroy {
   usuario: any = null;
   novoNome = '';
   senhaAtual = '';
   novaSenha = '';
   confirmarSenha = '';
-  notificacoesAtivas = false; // ✅ ADICIONADO
+  notificacoesAtivas = false;
+  online = true;
+  sincronizando = false;
+
+  private connectionSubscription: Subscription | null = null;
+  private avisoDismissed = false;
 
   constructor(
     private auth: AuthService,
-    private notifPermission: NotificationPermissionService, // ✅ ADICIONADO
-    private router: Router
+    private notifPermission: NotificationPermissionService,
+    private router: Router,
+    private connection: ConnectionService,
+    private cache: CacheService
   ) {
     this.usuario = auth.usuario();
     if (!this.usuario) {
@@ -167,8 +267,20 @@ export class PerfilComponent implements OnInit {
   }
 
   ngOnInit() {
-    // ✅ ADICIONADO: Verificar status das notificações
+    // ✅ VERIFICAR NOTIFICAÇÕES
     this.notificacoesAtivas = this.notifPermission.estaPermitido();
+
+    // ✅ MONITORAR CONEXÃO
+    this.connectionSubscription = this.connection.getStatus().subscribe((status: boolean) => {
+      this.online = status;
+      this.avisoDismissed = false;
+    });
+  }
+
+  ngOnDestroy() {
+    if (this.connectionSubscription) {
+      this.connectionSubscription.unsubscribe();
+    }
   }
 
   atualizarNome() {
@@ -187,7 +299,7 @@ export class PerfilComponent implements OnInit {
     });
   }
 
-  // ✅ ADICIONADO: Ativar notificações
+  // ✅ ATIVAR NOTIFICAÇÕES
   async ativarNotificacoes() {
     const permissao = await this.notifPermission.solicitarPermissao();
     this.notificacoesAtivas = permissao === 'granted';
@@ -200,7 +312,7 @@ export class PerfilComponent implements OnInit {
     }
   }
 
-  // ✅ ADICIONADO: Testar notificação
+  // ✅ TESTAR NOTIFICAÇÃO
   testarNotificacao() {
     this.notifPermission.testarNotificacao();
     alert('📢 Verifique se recebeu a notificação!');
@@ -241,5 +353,9 @@ export class PerfilComponent implements OnInit {
     this.senhaAtual = '';
     this.novaSenha = '';
     this.confirmarSenha = '';
+  }
+
+  fecharAviso() {
+    this.avisoDismissed = true;
   }
 }

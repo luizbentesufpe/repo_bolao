@@ -1,9 +1,13 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, OnDestroy } from '@angular/core';
 import { DatePipe, CommonModule } from '@angular/common';
 import { ApiService } from '../core/api.service';
 import { RankingItem, Jogo } from '../core/models';
 import { AuthService } from '../core/auth.service';
 import { SincronizacaoService } from '../core/sincronizacao.service';
+import { CacheService } from '../core/cache.service';
+import { ConnectionService } from '../core/connection.service';
+import { timeout, catchError } from 'rxjs/operators';
+import { of, Subscription } from 'rxjs';
 
 @Component({
   selector: 'app-ranking',
@@ -11,6 +15,27 @@ import { SincronizacaoService } from '../core/sincronizacao.service';
   imports: [DatePipe, CommonModule],
   template: `
     <main class="conteudo">
+      <!-- ✅ AVISO SEM INTERNET -->
+      @if (!online) {
+        <div class="aviso-sem-internet">
+          <div class="aviso-conteudo">
+            <span class="aviso-icone">📡</span>
+            <div class="aviso-texto">
+              <strong>Sem conexão com a internet</strong>
+              <p>Você está usando dados em cache. Os dados serão sincronizados quando a conexão retornar.</p>
+            </div>
+            <button class="aviso-fechar" (click)="fecharAviso()">✕</button>
+          </div>
+        </div>
+      }
+
+      <!-- ✅ INDICADOR DE SINCRONIZAÇÃO -->
+      @if (sincronizando) {
+        <div style="padding: 8px 12px; background: #fff8e1; border-left: 4px solid var(--amarelo); margin-bottom: 16px; border-radius: 4px; font-size: 12px; color: #666;">
+          🔄 Atualizando dados em tempo real...
+        </div>
+      }
+
       <h1 class="titulo-pagina">Mais acertos</h1>
       <p class="subtitulo">Classificação geral do bolão: pontos, placares exatos e apostas que pontuaram.</p>
       
@@ -22,8 +47,8 @@ import { SincronizacaoService } from '../core/sincronizacao.service';
         </div>
       }
       
-      @if (carregando) { 
-        <p class="vazio">Calculando o ranking…</p> 
+      @if (carregando && itens.length === 0) { 
+        <p class="vazio">⏳ Calculando o ranking…</p> 
       } @else if (itens.length === 0) {
         <p class="vazio">Ainda não há jogos com resultado lançado. O ranking aparece depois da primeira rodada.</p>
       } @else {
@@ -174,6 +199,75 @@ import { SincronizacaoService } from '../core/sincronizacao.service';
       --spacing-md: 12px;
       --spacing-lg: 16px;
       --spacing-xl: 20px;
+    }
+
+    /* ✅ AVISO SEM INTERNET */
+    .aviso-sem-internet {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      background: #ff6b6b;
+      color: white;
+      padding: 12px 16px;
+      z-index: 9999;
+      animation: slideDown 0.3s ease-out;
+    }
+
+    .aviso-conteudo {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      max-width: 800px;
+      margin: 0 auto;
+    }
+
+    .aviso-icone {
+      font-size: 24px;
+      flex-shrink: 0;
+    }
+
+    .aviso-texto {
+      flex: 1;
+      font-size: 13px;
+    }
+
+    .aviso-texto strong {
+      display: block;
+      margin-bottom: 2px;
+      font-size: 14px;
+    }
+
+    .aviso-texto p {
+      margin: 0;
+      opacity: 0.9;
+      line-height: 1.4;
+    }
+
+    .aviso-fechar {
+      background: none;
+      border: none;
+      color: white;
+      font-size: 20px;
+      cursor: pointer;
+      padding: 4px 8px;
+      flex-shrink: 0;
+      transition: opacity 0.2s;
+    }
+
+    .aviso-fechar:hover {
+      opacity: 0.8;
+    }
+
+    @keyframes slideDown {
+      from {
+        transform: translateY(-100%);
+        opacity: 0;
+      }
+      to {
+        transform: translateY(0);
+        opacity: 1;
+      }
     }
 
     /* ✅ TABELA - Desktop */
@@ -552,53 +646,120 @@ import { SincronizacaoService } from '../core/sincronizacao.service';
       color: var(--tinta-fraca);
       padding: var(--spacing-xl);
     }
+
+    .vazio {
+      text-align: center;
+      color: #999;
+      padding: 20px;
+    }
   `]
 })
-export class RankingComponent implements OnInit {
+export class RankingComponent implements OnInit, OnDestroy {
   itens: RankingItem[] = [];
-  carregando = true;
+  carregando = false;
   meuNome = '';
   peFreio: string = '';
   jogoConcluido = 0;
+  online = true;
+  sincronizando = false;
 
   participanteComFoco: RankingItem | null = null;
   jogosComPontos: any[] = [];
 
-  constructor(private api: ApiService, private sincronizacaoService: SincronizacaoService, auth: AuthService) {
+  private connectionSubscription: Subscription | null = null;
+  private avisoDismissed = false;
+
+  constructor(
+    private api: ApiService,
+    private sincronizacaoService: SincronizacaoService,
+    auth: AuthService,
+    private cache: CacheService,
+    private connection: ConnectionService
+  ) {
     this.meuNome = auth.usuario()?.nome ?? '';
   }
 
   ngOnInit() {
-  if (localStorage.getItem('DEBUG_RANKING') === 'true') {
-    const fakeData = [
-      { email: 'bruno@email.com', nome: 'Bruno', pontos: 45, exatos: 3, acertos: 12, apostas: 18, apostas_pontuadas: 12, apostas_em_jogos_concluidos: 12, apostas_pontuadas_em_jogos_concluidos: 12, posicao: 1 },
-      { email: 'user@email.com', nome: 'Seu Nome', pontos: 38, exatos: 1, acertos: 10, apostas: 18, apostas_pontuadas: 10, apostas_em_jogos_concluidos: 10, apostas_pontuadas_em_jogos_concluidos: 10, posicao: 2 },
-      { email: 'ana@email.com', nome: 'Ana Silva', pontos: 32, exatos: 2, acertos: 8, apostas: 18, apostas_pontuadas: 8, apostas_em_jogos_concluidos: 8, apostas_pontuadas_em_jogos_concluidos: 8, posicao: 3 },
-    ];
-    this.itens = fakeData;
-    this.jogoConcluido = 5;
-    this.carregando = false;
-    return; // ← Pula o resto
+    // 1️⃣ CARREGAR DO CACHE IMEDIATAMENTE
+    this.carregarDoCache();
+
+    // 2️⃣ SINCRONIZAR EM BACKGROUND
+    this.sincronizarEmBackground();
+
+    // 3️⃣ MONITORAR CONEXÃO
+    this.connectionSubscription = this.connection.getStatus().subscribe((status: boolean) => {
+      this.online = status;
+      this.avisoDismissed = false;
+    });
   }
 
-    this.sincronizacaoService.sincronizar();
-    this.api.ranking().subscribe(itens => {
-      this.itens = itens;
+  ngOnDestroy() {
+    if (this.connectionSubscription) {
+      this.connectionSubscription.unsubscribe();
+    }
+  }
 
-      this.api.jogos('todos').subscribe(jogos => {
-        this.jogoConcluido = jogos.filter(j => j.encerrado).length;
+  // ✅ FASE 1: CARREGAR DO CACHE (INSTANTÂNEO)
+  private carregarDoCache() {
+    console.log('📦 Carregando ranking do cache...');
+    
+    // Note: Ranking não usa cache de jogos, usa API direta
+    // Mas mantemos o padrão por consistência
+  }
+
+  // ✅ SINCRONIZAR EM BACKGROUND
+  private sincronizarEmBackground() {
+    console.log('🔄 Iniciando sincronização em background...');
+    this.sincronizando = true;
+
+    // Sincronizar (não retorna promise)
+    this.sincronizacaoService.sincronizar();
+    
+    // Carregar dados imediatamente em background
+    this.carregarRankingEmBackground();
+    
+    // Marcar como completo após timeout
+    setTimeout(() => {
+      this.sincronizando = false;
+      console.log('✅ Sincronização concluída!');
+    }, 2000);
+  }
+
+  // ✅ CARREGA RANKING EM BACKGROUND
+  private carregarRankingEmBackground() {
+    this.api.ranking().pipe(
+      timeout(15000),
+      catchError((error: any) => {
+        console.error('Erro ao carregar ranking:', error);
+        return of([]);
+      })
+    ).subscribe((itens: RankingItem[]) => {
+      if (itens && itens.length > 0) {
+        this.itens = itens;
         
-        if (this.jogoConcluido > 0) {
-          const piorAcerto = itens.reduce((pior, atual) => {
-            const peFreioAtual = this.peFreioCount(atual);
-            const peFreioPior = this.peFreioCount(pior);
-            return peFreioAtual > peFreioPior ? atual : pior;
-          });
-          this.peFreio = piorAcerto.nome;
-        }
-        
-        this.carregando = false;
-      });
+        // Carregar count de jogos concluídos
+        this.api.jogos('todos').pipe(
+          timeout(15000),
+          catchError((error: any) => {
+            console.error('Erro ao carregar jogos:', error);
+            return of([]);
+          })
+        ).subscribe((jogos: Jogo[]) => {
+          if (jogos && jogos.length > 0) {
+            this.jogoConcluido = jogos.filter(j => j.encerrado).length;
+            
+            if (this.jogoConcluido > 0) {
+              const piorAcerto = itens.reduce((pior, atual) => {
+                const peFreioAtual = this.peFreioCount(atual);
+                const peFreioPior = this.peFreioCount(pior);
+                return peFreioAtual > peFreioPior ? atual : pior;
+              });
+              this.peFreio = piorAcerto.nome;
+            }
+          }
+          console.log('✅ Dados do ranking atualizados!');
+        });
+      }
     });
   }
 
@@ -614,14 +775,14 @@ export class RankingComponent implements OnInit {
     this.participanteComFoco = item;
     this.jogosComPontos = [];
 
-    this.api.jogos('todos').subscribe(jogos => {
+    this.api.jogos('todos').subscribe((jogos: Jogo[]) => {
       const jogosEncerrados = jogos.filter(j => j.encerrado);
       const jogosFinais: any[] = [];
 
       jogosEncerrados.forEach(jogo => {
-        this.api.apostasDoJogo(jogo.id).subscribe(detalhe => {
+        this.api.apostasDoJogo(jogo.id).subscribe((detalhe: any) => {
           const apostaDoParticipante = detalhe.apostas.find(
-            aposta => aposta.email === item.email
+            (aposta: any) => aposta.email === item.email
           );
 
           if (apostaDoParticipante && apostaDoParticipante.pontos > 0) {
@@ -637,5 +798,9 @@ export class RankingComponent implements OnInit {
         });
       });
     });
+  }
+
+  fecharAviso() {
+    this.avisoDismissed = true;
   }
 }

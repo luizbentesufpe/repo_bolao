@@ -7,6 +7,9 @@ import { NotificationPermissionService } from '../core/notification.permission.s
 import { DeviceService } from '../core/device.service';
 import { PwaInstallService } from '../core/pwa-install.service';
 import { BackButtonService } from '../core/back-button.service';
+import { ConnectionService } from '../core/connection.service';
+import { SincronizacaoService } from '../core/sincronizacao.service';
+import { Subscription } from 'rxjs';
 
 @Component({
   selector: 'app-root',
@@ -22,8 +25,12 @@ export class AppComponent implements OnInit, OnDestroy {
   mostrarModalNotifNegada = false;
   mostrarModalSair = false;
   mostrarModalFecharApp = false;
+  online = true;
+  sincronizando = false;
 
   private backSubscription: any;
+  private connectionSubscription: Subscription | null = null;
+  private avisoDismissed = false;
 
   constructor(
     public auth: AuthService,
@@ -32,7 +39,9 @@ export class AppComponent implements OnInit, OnDestroy {
     private notifPermission: NotificationPermissionService,
     public device: DeviceService,
     public pwaService: PwaInstallService,
-    private backButton: BackButtonService
+    private backButton: BackButtonService,
+    private connection: ConnectionService,
+    private sincronizacaoService: SincronizacaoService
   ) { }
 
   /**
@@ -44,6 +53,18 @@ export class AppComponent implements OnInit, OnDestroy {
   }
 
   ngOnInit() {
+    // ✅ MONITORAR CONEXÃO
+    this.connectionSubscription = this.connection.getStatus().subscribe((status: boolean) => {
+      this.online = status;
+      this.avisoDismissed = false;
+      
+      // Se voltou online, sincronizar automaticamente
+      if (status) {
+        console.log('✅ Conexão retornou! Sincronizando...');
+        this.sincronizarEmBackground();
+      }
+    });
+
     if (this.auth.logado) {
       this.notifPermission.sincronizarNotificacoes().catch(e => {
         console.error('❌ Erro ao sincronizar:', e);
@@ -89,6 +110,23 @@ export class AppComponent implements OnInit, OnDestroy {
   }
 
   /**
+   * ✅ SINCRONIZAR EM BACKGROUND
+   */
+  private sincronizarEmBackground() {
+    console.log('🔄 Sincronizando em background...');
+    this.sincronizando = true;
+
+    // Sincronizar
+    this.sincronizacaoService.sincronizar();
+
+    // Marcar como completo
+    setTimeout(() => {
+      this.sincronizando = false;
+      console.log('✅ Sincronização concluída!');
+    }, 2000);
+  }
+
+  /**
    * ✅ Toggle do menu lateral
    */
   toggleMenu() {
@@ -125,6 +163,13 @@ export class AppComponent implements OnInit, OnDestroy {
   fecharModalPWA() {
     this.mostrarModalPWA = false;
     sessionStorage.setItem('fechou_modal_pwa', 'true');
+  }
+
+  /**
+   * ✅ Fechar aviso de internet
+   */
+  fecharAviso() {
+    this.avisoDismissed = true;
   }
 
   /**
@@ -175,6 +220,9 @@ export class AppComponent implements OnInit, OnDestroy {
   ngOnDestroy() {
     this.gameReminder.stop();
     this.backSubscription?.unsubscribe();
+    if (this.connectionSubscription) {
+      this.connectionSubscription.unsubscribe();
+    }
   }
 
   /**

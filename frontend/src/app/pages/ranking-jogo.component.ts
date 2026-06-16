@@ -69,66 +69,66 @@ function calcularPontosPrevisto(aposta: any, placarAtual: { gols_time1: number |
           </h3>
 
           @for (jogo of dia.jogos; track jogo.id) {
-            <div class="jogo-card" style="cursor: pointer; position: relative;" (click)="buscar(jogo.id)">
-              <div class="jogo-time">
-                <img [src]="jogo.time1.nome | bandeira" [alt]="jogo.time1.nome" 
-                     style="width: 32px; height: 24px; margin-right: 8px;">
-                {{ jogo.time1.nome }}
+            <article class="jogo-card" style="position: relative;" (click)="!usuariosMeusPalpites[jogo.id] || buscar(jogo.id)">
+              <!-- ✅ CONFRONTO (BANDEIRAS + TIMES + PLACAR) -->
+              <div class="jogo-confronto">
+                <div class="jogo-time">
+                  <img [src]="jogo.time1.nome | bandeira" [alt]="jogo.time1.nome" class="bandeira-ranking">
+                  <span>{{ jogo.time1.nome }}</span>
+                </div>
+
+                <div class="placar">
+                  <span class="digito" [class.vazio]="jogo.gols_time1 === null">{{ jogo.gols_time1 ?? '–' }}</span>
+                  <span class="x">×</span>
+                  <span class="digito" [class.vazio]="jogo.gols_time2 === null">{{ jogo.gols_time2 ?? '–' }}</span>
+                </div>
+
+                <div class="jogo-time dir">
+                  <span>{{ jogo.time2.nome }}</span>
+                  <img [src]="jogo.time2.nome | bandeira" [alt]="jogo.time2.nome" class="bandeira-ranking">
+                </div>
               </div>
 
-              <div class="placar">
-                <span class="digito" [class.vazio]="jogo.gols_time1 === null">
-                  {{ jogo.gols_time1 ?? '–' }}
-                </span>
-                <span class="x">×</span>
-                <span class="digito" [class.vazio]="jogo.gols_time2 === null">
-                  {{ jogo.gols_time2 ?? '–' }}
-                </span>
-              </div>
-
-              <div class="jogo-time dir">
-                {{ jogo.time2.nome }}
-                <img [src]="jogo.time2.nome | bandeira" [alt]="jogo.time2.nome" 
-                     style="width: 32px; height: 24px; margin-left: 8px;">
-              </div>
-
+              <!-- ✅ META (HORA, STATUS, PALPITE) -->
               <div class="jogo-meta">
-                {{ jogo.data_hora | date:'dd/MM HH:mm' }}
-                
-                <!-- ✅ STATUS CORRETO -->
+                <span class="hora">{{ jogo.data_hora | date:'HH:mm' }}</span>
+
                 @if (jogo.encerrado) {
-                  <span style="color: var(--campo); font-weight: 700; text-transform: uppercase; font-size: 11px;">✓ Encerrado</span>
+                  <span class="badge badge-encerrado">✓ Encerrado</span>
                 } @else if (jogo.ao_vivo) {
-                  <span style="color: var(--vermelho); font-weight: 700; text-transform: uppercase; font-size: 11px;">⚽ Ao vivo</span>
+                  <span class="badge badge-ao-vivo">🔴 Ao vivo</span>
                 } @else if (jogo.em_breve) {
-                  <span style="color: #999; font-weight: 700; text-transform: uppercase; font-size: 11px;">📅 Em breve</span>
+                  <span class="badge badge-em-breve">📅 Em breve</span>
+                }
+
+                @if (usuariosMeusPalpites[jogo.id]) {
+                  <span class="pontos-chip" [class.cheio]="jogo.encerrado && usuariosMeusPalpites[jogo.id].pontos > 0" (click)="jogoComPalpitesAberto = jogo.id; buscar(jogo.id); $event.stopPropagation()">
+                    {{ usuariosMeusPalpites[jogo.id].gols_time1 }}×{{ usuariosMeusPalpites[jogo.id].gols_time2 }}
+                    @if (jogo.encerrado) { · {{ usuariosMeusPalpites[jogo.id].pontos }} pts }
+                  </span>
                 }
               </div>
 
-              <!-- CORTINA COM SEU PALPITE -->
-              @if (usuariosMeusPalpites[jogo.id]) {
-                <div (click)="jogoComPalpitesAberto = jogo.id; buscar(jogo.id); $event.stopPropagation()" style="cursor: pointer; position: absolute; inset: 0; background: linear-gradient(135deg, rgba(255, 199, 44, 0.9) 0%, rgba(14, 122, 60, 0.9) 100%); border-radius: 10px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; backdrop-filter: blur(1px);">
-                  <span style="font-size: 12px; font-weight: 700; color: rgba(255,255,255,0.8); text-transform: uppercase; letter-spacing: 1px;">Seu palpite</span>
-                  <div style="font-size: 28px; font-family: var(--fonte-placar); font-weight: 700; color: white;">
-                    {{ usuariosMeusPalpites[jogo.id].gols_time1 }} × {{ usuariosMeusPalpites[jogo.id].gols_time2 }}
-                  </div>
-                  <!-- ✅ SÓ MOSTRA PONTOS SE ENCERRADO -->
-                  @if (jogo.encerrado && usuariosMeusPalpites[jogo.id].pontos > 0) {
-                    <span style="font-size: 14px; font-weight: 700; color: white; background: rgba(0,0,0,0.3); padding: 4px 10px; border-radius: 999px;">
-                      {{ usuariosMeusPalpites[jogo.id].pontos }} pts
-                    </span>
-                  }
-                  <span style="font-size: 11px; color: rgba(255,255,255,0.9); margin-top: 6px; font-weight: 700;">
-                    👥 clique para ver dos participantes
-                  </span>
-                </div>
-              } @else {
-                <!-- CORTINA SEM PALPITE -->
-                <div style="position: absolute; inset: 0; background: rgba(0, 0, 0, 0.3); border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; color: white; text-transform: uppercase;">
-                  Sem palpite
+              <!-- ✅ CORTINA SEM PALPITE -->
+              @if (!usuariosMeusPalpites[jogo.id]) {
+                <div class="cortina-sem-palpite" (click)="jogoComPalpitesAberto = jogo.id; buscar(jogo.id); $event.stopPropagation()">
+                  <span>⊘ SEM PALPITE</span>
+                  <span style="font-size: 11px; margin-top: 4px;">Clique para ver palpites</span>
                 </div>
               }
-            </div>
+
+              <!-- ✅ CORTINA SEU PALPITE -->
+              @if (usuariosMeusPalpites[jogo.id]) {
+                <div class="cortina-seu-palpite" (click)="jogoComPalpitesAberto = jogo.id; buscar(jogo.id); $event.stopPropagation()">
+                  <span class="cortina-titulo">Seu palpite</span>
+                  <div class="cortina-placar">{{ usuariosMeusPalpites[jogo.id].gols_time1 }} × {{ usuariosMeusPalpites[jogo.id].gols_time2 }}</div>
+                  @if (jogo.encerrado && usuariosMeusPalpites[jogo.id].pontos > 0) {
+                    <span class="cortina-pontos">{{ usuariosMeusPalpites[jogo.id].pontos }} pts</span>
+                  }
+                  <span style="font-size: 11px; margin-top: 4px;">👥 Clique para ver dos participantes</span>
+                </div>
+              }
+            </article>
           }
         </div>
       }
@@ -223,7 +223,211 @@ function calcularPontosPrevisto(aposta: any, placarAtual: { gols_time1: number |
   `,
   styles: [`
     .jogo-card {
+      background: white;
+      border: 1px solid var(--linha);
+      border-radius: 8px;
+      padding: 12px;
+      margin-bottom: 12px;
+      cursor: pointer;
       min-height: 120px;
+      transition: all 0.2s ease;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      position: relative;
+    }
+
+    .jogo-card:hover {
+      border-color: var(--amarelo);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+    }
+
+    /* ✅ CORTINAS */
+    .cortina-sem-palpite,
+    .cortina-seu-palpite {
+      position: absolute;
+      inset: 0;
+      border-radius: 8px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      backdrop-filter: blur(1px);
+    }
+
+    .cortina-sem-palpite {
+      background: rgba(0, 0, 0, 0.3);
+      color: white;
+      font-size: 12px;
+    }
+
+    .cortina-seu-palpite {
+    
+      background: linear-gradient(135deg, rgba(255, 199, 44, 0.95) 0%, rgba(14, 122, 60, 0.95) 100%);
+      color: white;
+    }
+
+    .cortina-titulo {
+      font-size: 12px;
+      opacity: 0.9;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .cortina-placar {
+      font-size: 28px;
+      font-family: var(--fonte-placar);
+      font-weight: 700;
+    }
+
+    .cortina-pontos {
+      font-size: 12px;
+      background: rgba(0, 0, 0, 0.2);
+      padding: 3px 10px;
+      border-radius: 12px;
+    }
+
+    .jogo-confronto {
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .jogo-time {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-weight: 700;
+      font-size: 13px;
+      color: var(--tinta);
+    }
+
+    .jogo-time.dir {
+      justify-self: end;
+      flex-direction: row-reverse;
+    }
+
+    .bandeira-ranking {
+      width: 32px;
+      height: 24px;
+      object-fit: cover;
+      border-radius: 2px;
+      flex-shrink: 0;
+    }
+
+    .placar {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      justify-content: center;
+    }
+
+    .digito {
+      font-size: 24px;
+      font-weight: 700;
+      color: var(--amarelo);
+      min-width: 28px;
+      text-align: center;
+    }
+
+    .digito.vazio {
+      color: #bbb;
+    }
+
+    .x {
+      font-weight: 700;
+      font-size: 16px;
+      color: var(--tinta-fraca);
+    }
+
+    .jogo-meta {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      color: var(--tinta-fraca);
+      padding-top: 8px;
+      border-top: 1px solid #f0f0f0;
+    }
+
+    .hora {
+      font-weight: 700;
+      color: var(--tinta);
+      font-size: 13px;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 3px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+
+    .badge-encerrado {
+      background: var(--campo);
+      color: white;
+    }
+
+    .badge-ao-vivo {
+      background: var(--vermelho);
+      color: white;
+    }
+
+    .badge-em-breve {
+      background: #e0e0e0;
+      color: #666;
+    }
+
+    .pontos-chip {
+      display: inline-block;
+      background: #e8f5ee;
+      color: var(--campo);
+      padding: 3px 10px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .pontos-chip:hover {
+      background: #c8e6c9;
+    }
+
+    .pontos-chip.cheio {
+      background: var(--campo);
+      color: white;
+    }
+
+
+    @media (max-width: 480px) {
+      .jogo-card {
+        grid-template-columns: auto 1fr;
+        padding: 8px;
+      }
+
+      .jogo-time {
+        font-size: 11px;
+      }
+
+      .digito {
+        font-size: 20px;
+        min-width: 24px;
+      }
+
+      .filtros button {
+        font-size: 12px;
+        padding: 6px 12px;
+      }
     }
   `]
 })
@@ -238,6 +442,10 @@ export class RankingJogoComponent implements OnInit, OnDestroy {
   usuariosMeusPalpites: { [key: number]: any } = {};
   jogoComPalpitesAberto: number | null = null;
 
+  // ✅ POLLING DE PLACARES
+  private pollingInterval: any;
+  onPlacareAtualizados: ((dados: any) => void) | null = null;
+
   constructor(private api: ApiService, private sincronizacaoService: SincronizacaoService, auth: AuthService) {
     this.meuEmail = auth.usuario()?.email ?? '';
   }
@@ -246,9 +454,15 @@ export class RankingJogoComponent implements OnInit, OnDestroy {
     this.sincronizacaoService.sincronizar();
     this.carregarDados();
     this.atualizarLista();
+
+    // ✅ POLLING A CADA 1 MINUTO (APENAS PLACARES)
+    this.iniciarPollingPlacares();
   }
 
-  ngOnDestroy() {}
+  ngOnDestroy() {
+    // ✅ PARAR POLLING
+    this.pararPollingPlacares();
+  }
 
   // ✅ FUNÇÃO PARA CALCULAR PONTOS PREVISTO
   calcularPrevisto(aposta: any): number {
@@ -257,6 +471,69 @@ export class RankingJogoComponent implements OnInit, OnDestroy {
       gols_time1: this.detalhe.jogo.gols_time1,
       gols_time2: this.detalhe.jogo.gols_time2
     });
+  }
+
+  /**
+   * ✅ POLLING A CADA 1 MINUTO - APENAS PLACARES
+   */
+  private iniciarPollingPlacares() {
+    console.log('⏱️ Iniciando polling de placares (ranking jogo)...');
+
+    this.sincronizarPlacares();
+
+    this.pollingInterval = setInterval(() => {
+      console.log('🔄 Atualizando placares (ranking jogo)...');
+      this.sincronizarPlacares();
+    }, 60000); // 60 segundos = 1 minuto
+  }
+
+  /**
+   * ✅ SINCRONIZAR APENAS PLACARES
+   */
+  private sincronizarPlacares() {
+    this.api.jogos('todos').subscribe((jogosNovos: Jogo[]) => {
+      if (jogosNovos && jogosNovos.length > 0) {
+        // ✅ ATUALIZAR APENAS PLACARES
+        jogosNovos.forEach(jogoNovo => {
+          const jogoAtual = this.jogos.find(j => j.id === jogoNovo.id);
+
+          if (jogoAtual) {
+            jogoAtual.gols_time1 = jogoNovo.gols_time1;
+            jogoAtual.gols_time2 = jogoNovo.gols_time2;
+            jogoAtual.encerrado = jogoNovo.encerrado;
+            jogoAtual.ao_vivo = jogoNovo.ao_vivo;
+
+            // ✅ ATUALIZAR DETALHE SE ESTIVER ABERTO
+            if (this.detalhe && this.detalhe.jogo.id === jogoNovo.id) {
+              this.detalhe.jogo.gols_time1 = jogoNovo.gols_time1;
+              this.detalhe.jogo.gols_time2 = jogoNovo.gols_time2;
+              this.detalhe.jogo.encerrado = jogoNovo.encerrado;
+              this.detalhe.jogo.ao_vivo = jogoNovo.ao_vivo;
+            }
+          }
+        });
+
+        console.log('✅ Placares atualizados (ranking jogo)!');
+
+        // ✅ CHAMAR onChange
+        if (this.onPlacareAtualizados) {
+          this.onPlacareAtualizados({
+            timestamp: new Date(),
+            totalJogos: jogosNovos.length
+          });
+        }
+      }
+    });
+  }
+
+  /**
+   * ✅ PARAR POLLING
+   */
+  private pararPollingPlacares() {
+    if (this.pollingInterval) {
+      clearInterval(this.pollingInterval);
+      console.log('⏹️ Polling de placares parado (ranking jogo)');
+    }
   }
 
   atualizarLista() {
@@ -286,15 +563,21 @@ export class RankingJogoComponent implements OnInit, OnDestroy {
       switch (this.periodo) {
         case 'hoje':
           jogos = jogos.filter(j => {
-            const dataJogo = new Date(j.data_hora);
-            const diaJogo = new Date(dataJogo.getFullYear(), dataJogo.getMonth(), dataJogo.getDate());
+            const dataReal = new Date(j.data_hora);
+            const ehMeiaNoite = dataReal.getHours() === 0 && dataReal.getMinutes() === 0 && dataReal.getSeconds() === 0;
+            const dataChave = new Date(dataReal);
+            if (ehMeiaNoite) dataChave.setSeconds(-1);
+            const diaJogo = new Date(dataChave.getFullYear(), dataChave.getMonth(), dataChave.getDate());
             return diaJogo.getTime() === hoje.getTime();
           });
           break;
         case 'semana':
           jogos = jogos.filter(j => {
-            const dataJogo = new Date(j.data_hora);
-            return dataJogo >= hoje && dataJogo <= proximaSemana;
+            const dataReal = new Date(j.data_hora);
+            const ehMeiaNoite = dataReal.getHours() === 0 && dataReal.getMinutes() === 0 && dataReal.getSeconds() === 0;
+            const dataChave = new Date(dataReal);
+            if (ehMeiaNoite) dataChave.setSeconds(-1);
+            return dataChave >= hoje && dataChave <= proximaSemana;
           });
           break;
         default:
@@ -310,9 +593,14 @@ export class RankingJogoComponent implements OnInit, OnDestroy {
     const mapa = new Map<string, Jogo[]>();
     
     this.jogosFiltrados.forEach(jogo => {
-      const dataLocal = new Date(jogo.data_hora);
-      const chave = dataLocal.toLocaleDateString('pt-BR')
-        .split('/').reverse().join('-');
+      const dataReal = new Date(jogo.data_hora);
+      const ehMeiaNoite = dataReal.getHours() === 0 && dataReal.getMinutes() === 0 && dataReal.getSeconds() === 0;
+
+      // Meia-noite aparece no dia anterior, sem duplicata
+      const dataChave = new Date(dataReal);
+      if (ehMeiaNoite) dataChave.setSeconds(-1);
+
+      const chave = dataChave.toLocaleDateString('pt-BR').split('/').reverse().join('-');
       
       if (!mapa.has(chave)) {
         mapa.set(chave, []);
