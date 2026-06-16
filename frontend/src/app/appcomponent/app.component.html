@@ -1,3 +1,24 @@
+<!-- ✅ AVISO SEM INTERNET (global) -->
+@if (!online) {
+  <div class="aviso-sem-internet">
+    <div class="aviso-conteudo">
+      <span class="aviso-icone">📡</span>
+      <div class="aviso-texto">
+        <strong>Sem conexão com a internet</strong>
+        <p>Você está usando dados em cache. Os dados serão sincronizados quando a conexão retornar.</p>
+      </div>
+      <button class="aviso-fechar" (click)="fecharAviso()">✕</button>
+    </div>
+  </div>
+}
+
+<!-- ✅ INDICADOR DE SINCRONIZAÇÃO (global) -->
+@if (sincronizando) {
+  <div class="indicador-sync">
+    🔄 Atualizando dados em tempo real...
+  </div>
+}
+
 @if (auth.logado) {
   <header class="topo">
     <div class="topo-inner">

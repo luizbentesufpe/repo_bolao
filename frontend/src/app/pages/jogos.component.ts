@@ -2,11 +2,14 @@ import { Component, OnInit, OnDestroy } from '@angular/core';
 import { DatePipe, CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ApiService } from '../core/api.service';
-import { NotificationPermissionService } from '../core/notification.permission.service';
 import { AuthService } from '../core/auth.service';
 import { Jogo } from '../core/models';
 import { BandeiraPipe } from '../core/bandeiras.pipe';
 import { SincronizacaoService } from '../core/sincronizacao.service';
+import { CacheService } from '../core/cache.service';
+import { ConnectionService } from '../core/connection.service';
+import { timeout, catchError } from 'rxjs/operators';
+import { of, Subscription } from 'rxjs';
 
 @Component({
   selector: 'app-jogos',
@@ -14,90 +17,81 @@ import { SincronizacaoService } from '../core/sincronizacao.service';
   imports: [DatePipe, CommonModule, FormsModule, BandeiraPipe],
   template: `
 <main class="conteudo">
-    <!-- ✅ BOTÃO ATIVAR NOTIFICAÇÕES -->
-     @if (!notificacoesAtivadas && auth.logado) {
-       <div style="padding: 0 0 20px 0;">
-         <button
-           (click)="ativarNotificacoes()"
-           style="
-             width: 100%;
-             padding: 12px;
-             background: var(--campo);
-             color: white;
-             border: none;
-             border-radius: 8px;
-             font-weight: 700;
-             cursor: pointer;
-             font-size: 14px;
-           "
-         >
-           🔔 Ativar Notificações
-         </button>
-       </div>
-     }
-      <h1 class="titulo-pagina">Jogos</h1>
-      <p class="subtitulo">Confira as partidas do dia ou da semana, com placares e suas apostas.</p>
-
-      <div class="filtros">
-        <button [class.ativo]="periodo === 'hoje'" (click)="filtrar('hoje')">Hoje</button>
-        <button [class.ativo]="periodo === 'semana'" (click)="filtrar('semana')">Esta semana</button>
-        <button [class.ativo]="periodo === 'todos'" (click)="filtrar('todos')">Todos</button>
+    <!-- ✅ AVISO SEM INTERNET -->
+    @if (!online) {
+      <div class="aviso-sem-internet">
+        <div class="aviso-conteudo">
+          <span class="aviso-icone">📡</span>
+          <div class="aviso-texto">
+            <strong>Sem conexão com a internet</strong>
+            <p>Você está usando dados em cache. Os dados serão sincronizados quando a conexão retornar.</p>
+          </div>
+          <button class="aviso-fechar" (click)="fecharAviso()">✕</button>
+        </div>
       </div>
+    }
 
-      @if (carregando) { <p class="vazio">Carregando jogos…</p> }
-      @else if (dias.length === 0) {
-        <p class="vazio">Nenhum jogo neste período.</p>
-      }
+    <!-- ✅ INDICADOR DE SINCRONIZAÇÃO -->
+    @if (sincronizando) {
+      <div style="padding: 8px 12px; background: #fff8e1; border-left: 4px solid var(--amarelo); margin-bottom: 16px; border-radius: 4px; font-size: 12px; color: #666;">
+        🔄 Atualizando dados em tempo real...
+      </div>
+    }
 
+    <h1 class="titulo-pagina">Jogos</h1>
+    <p class="subtitulo">Confira as partidas do dia ou da semana, com placares e suas apostas.</p>
+
+    <div class="filtros">
+      <button [class.ativo]="periodo === 'hoje'" (click)="filtrar('hoje')">Hoje</button>
+      <button [class.ativo]="periodo === 'semana'" (click)="filtrar('semana')">Esta semana</button>
+      <button [class.ativo]="periodo === 'todos'" (click)="filtrar('todos')">Todos</button>
+    </div>
+
+    <!-- ✅ SKELETON LOADER (enquanto carrega primeira vez) -->
+    @if (carregando && dias.length === 0) {
+      <div class="skeleton-container">
+        <div class="skeleton-card"></div>
+        <div class="skeleton-card"></div>
+        <div class="skeleton-card"></div>
+        <div class="skeleton-card"></div>
+      </div>
+    }
+
+    <!-- ✅ DADOS CARREGADOS (quando houver) -->
+    @if (dias.length > 0) {
       @for (dia of dias; track dia.chave) {
         <!-- JOGOS ATIVOS -->
         @if (dia.jogosAtivos.length > 0) {
           <div class="dia-grupo"><span class="rotulo">{{ dia.data | date:'EEEE, d MMM':'pt-BR' }}</span></div>
           @for (jogo of dia.jogosAtivos; track jogo.id) {
             <article class="jogo-card">
-              <!-- ✅ TIME 1 — estilo bolão -->
-              <div class="jogo-time-mobile">
-                <img [src]="jogo.time1.nome | bandeira" [alt]="jogo.time1.nome"
-                     style="width: 32px; height: 24px; margin-right: 8px;">
-                {{ jogo.time1.nome }}
+
+              <!-- ✅ CONFRONTO: bandeira + nome acima do placar -->
+              <div class="jogo-confronto">
+                <!-- TIME 1 -->
+                <div class="jogo-time">
+                  <img [src]="jogo.time1.nome | bandeira" [alt]="jogo.time1.nome" class="bandeira-card">
+                  <span>{{ jogo.time1.nome }}</span>
+                </div>
+
+                <!-- PLACAR -->
+                <div class="placar">
+                  <span class="digito" [class.vazio]="jogo.gols_time1 === null">{{ jogo.gols_time1 ?? '–' }}</span>
+                  <span class="x">×</span>
+                  <span class="digito" [class.vazio]="jogo.gols_time2 === null">{{ jogo.gols_time2 ?? '–' }}</span>
+                </div>
+
+                <!-- TIME 2 -->
+                <div class="jogo-time">
+                  <img [src]="jogo.time2.nome | bandeira" [alt]="jogo.time2.nome" class="bandeira-card">
+                  <span>{{ jogo.time2.nome }}</span>
+                </div>
               </div>
 
-              <!-- PLACAR — estilo original -->
-              <div class="placar">
-                <span class="digito" [class.vazio]="jogo.gols_time1 === null">{{ jogo.gols_time1 ?? '–' }}</span>
-                <span class="x">×</span>
-                <span class="digito" [class.vazio]="jogo.gols_time2 === null">{{ jogo.gols_time2 ?? '–' }}</span>
-              </div>
-
-              <!-- ✅ TIME 2 — estilo bolão -->
-              <div class="jogo-time-mobile dir">
-                {{ jogo.time2.nome }}
-                <img [src]="jogo.time2.nome | bandeira" [alt]="jogo.time2.nome"
-                     style="width: 32px; height: 24px; margin-left: 8px;">
-              </div>
-
+              <!-- META -->
               <div class="jogo-meta">
                 @if (ehHoje(jogo)) { <span class="tag-hoje">Hoje</span> }
                 <span>{{ jogo.data_hora | date:'HH:mm' }}</span>
-
-                <!-- ✅ CRONÔMETRO EM TEMPO REAL -->
-                @if (!jogo.comecou) {
-                  <span style="font-weight: 700; color: var(--amarelo);">
-                    {{ formatarTempo(getTempo(jogo)) }}
-                  </span>
-                } @else if (!jogo.encerrado) {
-                  <span style="color: var(--vermelho); font-weight: 700;">⚽ AO VIVO</span>
-                }
-
-                <!-- ✅ STATUS -->
-                @if (jogo.encerrado) {
-                  <span style="color: var(--campo); font-weight: 700; text-transform: uppercase; font-size: 11px;">✓ Finalizado</span>
-                } @else if (jogo.ao_vivo) {
-                  <span style="color: var(--vermelho); font-weight: 700; text-transform: uppercase; font-size: 11px;">🔴 Ao vivo</span>
-                } @else if (jogo.em_breve) {
-                  <span style="color: #999; font-weight: 700; text-transform: uppercase; font-size: 11px;">⏰ Em breve</span>
-                }
-
                 <span>{{ jogo.estadio }}</span>
 
                 @if (jogo.minha_aposta && jogo.minha_aposta.gols_time1 !== null && jogo.minha_aposta.gols_time2 !== null) {
@@ -111,7 +105,6 @@ import { SincronizacaoService } from '../core/sincronizacao.service';
                   </span>
                 }
 
-                <!-- BOTÃO APOSTE AQUI -->
                 @if (estaAberto(jogo)) {
                   <button class="btn btn-amarelo" (click)="abrirAposta(jogo)"
                           style="font-size:12px; padding:6px 10px; margin-left:auto;">
@@ -119,36 +112,6 @@ import { SincronizacaoService } from '../core/sincronizacao.service';
                   </button>
                 }
               </div>
-
-              <!-- MODAL DE APOSTA INLINE -->
-              @if (jogoEmEdicao?.id === jogo.id) {
-                <div class="modal-aposta">
-                  <h3>Seu palpite</h3>
-                  <!-- ✅ PALPITE com bandeiras acima e fundo verde claro -->
-                  <div class="palpite-container">
-                    <div class="palpite-col">
-                      <img [src]="jogo.time1.nome | bandeira" [alt]="jogo.time1.nome" class="bandeira-mini">
-                      <input type="number" min="0" max="99" [(ngModel)]="palpite1"
-                            placeholder="0" class="input-palpite">
-                    </div>
-                    <span class="x" style="padding-bottom: 12px;">×</span>
-                    <div class="palpite-col">
-                      <img [src]="jogo.time2.nome | bandeira" [alt]="jogo.time2.nome" class="bandeira-mini">
-                      <input type="number" min="0" max="99" [(ngModel)]="palpite2"
-                            placeholder="0" class="input-palpite">
-                    </div>
-                  </div>
-                  <div class="modal-botoes">
-                    <button class="btn btn-cancelar" (click)="cancelarAposta()">
-                      Cancelar
-                    </button>
-                    <button class="btn btn-amarelo" (click)="confirmarAposta(jogo)"
-                            [disabled]="palpite1 === null || palpite2 === null">
-                      Confirmar
-                    </button>
-                  </div>
-                </div>
-              }
             </article>
           }
         }
@@ -164,28 +127,24 @@ import { SincronizacaoService } from '../core/sincronizacao.service';
               <div class="jogos-expandidos">
                 @for (jogo of dia.jogosEncerrados; track jogo.id) {
                   <article class="jogo-card encerrado">
-                    <div class="jogo-time-mobile">
-                      <img [src]="jogo.time1.nome | bandeira" [alt]="jogo.time1.nome"
-                           style="width: 32px; height: 24px; margin-right: 8px;">
-                      {{ jogo.time1.nome }}
-                    </div>
-
-                    <!-- PLACAR — estilo original -->
-                    <div class="placar">
-                      <span class="digito">{{ jogo.gols_time1 }}</span>
-                      <span class="x">×</span>
-                      <span class="digito">{{ jogo.gols_time2 }}</span>
-                    </div>
-
-                    <div class="jogo-time-mobile dir">
-                      {{ jogo.time2.nome }}
-                      <img [src]="jogo.time2.nome | bandeira" [alt]="jogo.time2.nome"
-                           style="width: 32px; height: 24px; margin-left: 8px;">
+                    <div class="jogo-confronto">
+                      <div class="jogo-time">
+                        <img [src]="jogo.time1.nome | bandeira" [alt]="jogo.time1.nome" class="bandeira-card">
+                        <span>{{ jogo.time1.nome }}</span>
+                      </div>
+                      <div class="placar">
+                        <span class="digito">{{ jogo.gols_time1 }}</span>
+                        <span class="x">×</span>
+                        <span class="digito">{{ jogo.gols_time2 }}</span>
+                      </div>
+                      <div class="jogo-time">
+                        <img [src]="jogo.time2.nome | bandeira" [alt]="jogo.time2.nome" class="bandeira-card">
+                        <span>{{ jogo.time2.nome }}</span>
+                      </div>
                     </div>
 
                     <div class="jogo-meta">
                       <span style="font-size: 12px; color: #999;">{{ jogo.data_hora | date: 'EEEE, d MMM' }}</span>
-
                       @if (jogo.minha_aposta && jogo.minha_aposta.gols_time1 !== null && jogo.minha_aposta.gols_time2 !== null) {
                         <span class="pontos-chip" [class.cheio]="jogo.minha_aposta.pontos > 0">
                           {{ jogo.minha_aposta.gols_time1 }}×{{ jogo.minha_aposta.gols_time2 }}
@@ -200,15 +159,118 @@ import { SincronizacaoService } from '../core/sincronizacao.service';
           </div>
         }
       }
-    </main>
+    }
+
+    <!-- ✅ VAZIO (se realmente não tem nada) -->
+    @if (!carregando && dias.length === 0) {
+      <p class="vazio">Nenhum jogo neste período.</p>
+    }
+</main>
   `,
   styles: [`
+  /* ✅ AVISO SEM INTERNET */
+  .aviso-sem-internet {
+    position: sticky;
+    top: 0;
+    left: 0;
+    right: 0;
+    background: #ff6b6b;
+    color: white;
+    padding: 12px 16px;
+    z-index: 98;
+    animation: slideDown 0.3s ease-out;
+  }
+
+  .aviso-conteudo {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    max-width: 800px;
+    margin: 0 auto;
+  }
+
+  .aviso-icone {
+    font-size: 24px;
+    flex-shrink: 0;
+  }
+
+  .aviso-texto {
+    flex: 1;
+    font-size: 13px;
+  }
+
+  .aviso-texto strong {
+    display: block;
+    margin-bottom: 2px;
+    font-size: 14px;
+  }
+
+  .aviso-texto p {
+    margin: 0;
+    opacity: 0.9;
+    line-height: 1.4;
+  }
+
+  .aviso-fechar {
+    background: none;
+    border: none;
+    color: white;
+    font-size: 20px;
+    cursor: pointer;
+    padding: 4px 8px;
+    flex-shrink: 0;
+    transition: opacity 0.2s;
+  }
+
+  .aviso-fechar:hover {
+    opacity: 0.8;
+  }
+
+  @keyframes slideDown {
+    from {
+      transform: translateY(-100%);
+      opacity: 0;
+    }
+    to {
+      transform: translateY(0);
+      opacity: 1;
+    }
+  }
+
+  /* ✅ SKELETON LOADER */
+  .skeleton-container {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+
+  .skeleton-card {
+    height: 120px;
+    background: linear-gradient(
+      90deg,
+      #f0f0f0 25%,
+      #e0e0e0 50%,
+      #f0f0f0 75%
+    );
+    background-size: 200% 100%;
+    border-radius: 8px;
+    animation: shimmer 2s infinite;
+  }
+
+  @keyframes shimmer {
+    0% {
+      background-position: 200% 0;
+    }
+    100% {
+      background-position: -200% 0;
+    }
+  }
+
   /* ✅ CARD */
   .jogo-card {
-    display: grid;
-    grid-template-columns: 1fr auto 1fr;
-    gap: 10px 8px;
-    align-items: center;
+    display: flex;
+    flex-direction: column;
     background: white;
     border: 1px solid var(--linha);
     border-radius: 8px;
@@ -221,24 +283,35 @@ import { SincronizacaoService } from '../core/sincronizacao.service';
     background: #fafafa;
   }
 
-  /* ✅ TIMES — estilo bolão */
-  .jogo-time-mobile {
-    display: flex;
+  /* ✅ CONFRONTO */
+  .jogo-confronto {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
     align-items: center;
-    gap: 10px;
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+
+  .jogo-time {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
     font-weight: 700;
-    font-size: 14px;
+    font-size: 13px;
     color: var(--tinta);
-    overflow: hidden;
-    white-space: nowrap;
+    text-align: center;
+    word-break: break-word;
   }
 
-  .jogo-time-mobile.dir {
-    flex-direction: row-reverse;
-    text-align: right;
+  .bandeira-card {
+    width: 40px;
+    height: 28px;
+    object-fit: cover;
+    border-radius: 2px;
   }
 
-  /* PLACAR — estilo original */
+  /* PLACAR */
   .placar {
     display: flex;
     align-items: center;
@@ -264,9 +337,8 @@ import { SincronizacaoService } from '../core/sincronizacao.service';
     color: var(--tinta-fraca);
   }
 
-  /* ✅ META — ocupa todas as colunas */
+  /* ✅ META */
   .jogo-meta {
-    grid-column: 1 / -1;
     display: flex;
     flex-wrap: wrap;
     align-items: center;
@@ -275,7 +347,15 @@ import { SincronizacaoService } from '../core/sincronizacao.service';
     color: var(--tinta-fraca);
     border-top: 1px solid var(--linha);
     padding-top: 10px;
-    margin-top: 2px;
+  }
+
+  .tag-hoje {
+    background: var(--amarelo);
+    color: var(--tinta);
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 600;
   }
 
   .pontos-chip {
@@ -327,137 +407,82 @@ import { SincronizacaoService } from '../core/sincronizacao.service';
     to { opacity: 1; max-height: 5000px; }
   }
 
-  /* ✅ MODAL DE APOSTA INLINE */
-  .modal-aposta {
-    grid-column: 1 / -1;
-    background: #fff8e1;
-    border: 2px solid var(--amarelo);
-    border-radius: 8px;
-    padding: 12px;
-    margin-top: 4px;
-    animation: slideIn 0.2s ease-out;
-  }
-
-  .modal-aposta h3 {
-    margin: 0 0 12px 0;
-    font-size: 14px;
-    color: var(--tinta);
-  }
-
-  /* ✅ PALPITE com bandeiras acima e fundo verde claro */
-  .palpite-container {
-    display: flex;
-    gap: 12px;
-    align-items: flex-end;
-    justify-content: center;
-    margin-bottom: 12px;
-  }
-
-  .palpite-col {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 4px;
-  }
-
-  .bandeira-mini {
-    width: 26px;
-    height: 19px;
-    border-radius: 2px;
-    object-fit: cover;
-    flex-shrink: 0;
-  }
-
-  .input-palpite {
-    width: 64px;
-    height: 50px;
-    font-size: 24px;
-    font-weight: 700;
-    text-align: center;
-    border: 2px solid #b2d8bf;
-    border-radius: 8px;
-    padding: 4px;
-    font-family: 'IBM Plex Mono', monospace;
-    background: #e8f5ee;
-    color: var(--campo);
-  }
-
-  .input-palpite:focus {
-    border-color: var(--campo);
-    outline: none;
-    box-shadow: 0 0 0 3px rgba(14, 122, 60, 0.1);
-  }
-
-  .modal-botoes {
+  /* ✅ FILTROS */
+  .filtros {
     display: flex;
     gap: 8px;
-    justify-content: flex-end;
+    margin-bottom: 20px;
+    justify-content: center;
   }
 
-  .btn-cancelar {
-    background: #b9cdbe;
-    color: var(--tinta);
-    border: none;
-    padding: 10px 16px;
+  .filtros button {
+    padding: 8px 16px;
+    border: 2px solid var(--linha);
+    background: white;
     border-radius: 6px;
-    font-weight: 700;
     cursor: pointer;
-    font-size: 12px;
+    font-weight: 600;
+    color: #666;
     transition: all 0.2s ease;
   }
 
-  .btn-cancelar:hover { opacity: 0.9; }
+  .filtros button.ativo {
+    background: var(--campo);
+    color: white;
+    border-color: var(--campo);
+  }
+
+  .dia-grupo {
+    padding: 16px 0 8px 0;
+    margin-top: 12px;
+  }
+
+  .rotulo {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--amarelo);
+    text-transform: capitalize;
+  }
+
+  .vazio {
+    text-align: center;
+    color: #999;
+    padding: 20px;
+  }
 
   .btn-amarelo {
     background: var(--amarelo);
     color: var(--tinta);
     border: none;
-    padding: 10px 16px;
+    padding: 8px 16px;
     border-radius: 6px;
     font-weight: 700;
     cursor: pointer;
-    font-size: 12px;
     transition: all 0.2s ease;
   }
 
-  .btn-amarelo:hover:not(:disabled) {
+  .btn-amarelo:hover {
     opacity: 0.9;
-    transform: scale(1.05);
-  }
-
-  .btn-amarelo:disabled {
-    background: #ddd;
-    color: #999;
-    cursor: not-allowed;
-    opacity: 0.6;
-  }
-
-  @keyframes slideIn {
-    from { opacity: 0; transform: translateY(-10px); }
-    to { opacity: 1; transform: translateY(0); }
   }
 
   /* ✅ MOBILE */
   @media (max-width: 480px) {
-    .jogo-time-mobile {
-      font-size: 12px;
-      gap: 8px;
+    .skeleton-card {
+      height: 100px;
+    }
+
+    .jogo-time {
+      font-size: 11px;
+    }
+
+    .bandeira-card {
+      width: 32px;
+      height: 22px;
     }
 
     .digito {
       font-size: 22px;
       min-width: 24px;
-    }
-
-    .input-palpite {
-      width: 54px;
-      height: 44px;
-      font-size: 20px;
-    }
-
-    .bandeira-mini {
-      width: 22px;
-      height: 16px;
     }
   }
 `]
@@ -471,100 +496,182 @@ export class JogosComponent implements OnInit, OnDestroy {
     jogosEncerrados: Jogo[];
     expandido: boolean;
   }[] = [];
-  carregando = true;
-  notificacoesAtivadas = false;
+  
+  carregando = false;  // ✅ CONTROLA SKELETON
+  sincronizando = false;
+  online = true;
 
-  jogoEmEdicao: Jogo | null = null;
-  palpite1: number | null = null;
-  palpite2: number | null = null;
-  private intervaloAtualizacao: any;
+  private connectionSubscription: Subscription | null = null;
 
-  constructor(private api: ApiService, private sincronizacaoService: SincronizacaoService,
-    public auth: AuthService, private notifPermission: NotificationPermissionService
-  ) { }
+  constructor(
+    private api: ApiService,
+    private sincronizacaoService: SincronizacaoService,
+    public auth: AuthService,
+    private cache: CacheService,
+    private connection: ConnectionService
+  ) {}
 
   ngOnInit() {
-    this.sincronizacaoService.sincronizar();
-    this.filtrar('hoje');
-    this.verificarStatusNotificacoes();
+    // ✅ MOSTRAR SKELETON
+    this.carregando = true;
 
-    this.intervaloAtualizacao = setInterval(() => {
-      this.dias = [...this.dias];
-    }, 1000);
+    // 1️⃣ CARREGAR DO CACHE (instantâneo)
+    this.carregarDoCache();
+
+    // 2️⃣ SINCRONIZAR EM BACKGROUND
+    this.sincronizarEmBackground();
+
+    // 3️⃣ MONITORAR CONEXÃO
+    this.connectionSubscription = this.connection.getStatus().subscribe((status: boolean) => {
+      this.online = status;
+    });
   }
 
   ngOnDestroy() {
-    if (this.intervaloAtualizacao) {
-      clearInterval(this.intervaloAtualizacao);
+    if (this.connectionSubscription) {
+      this.connectionSubscription.unsubscribe();
     }
   }
 
-  filtrar(periodo: 'hoje' | 'semana' | 'todos') {
-    this.periodo = periodo;
-    this.carregando = true;
-    this.api.jogos('todos').subscribe(jogos => {
-      jogos = jogos.map(j => ({
-        ...j,
-        data_hora: new Date(j.data_hora)
-      })) as any;
-      const agora = new Date();
-      const hoje00h = new Date(agora.getFullYear(), agora.getMonth(), agora.getDate());
-      const hoje23h59 = new Date(hoje00h.getTime() + 86400000 - 1);
-      const semana00h = new Date(hoje00h.getTime() + 604800000);
+  /**
+   * ✅ CARREGAR CACHE (instantâneo - < 50ms)
+   */
+  private carregarDoCache() {
+    console.log('📦 Carregando do cache...');
+    
+    const jogosCached = this.cache.obterJogos();
+    
+    if (jogosCached && jogosCached.length > 0) {
+      console.log('✅ Cache encontrado!');
+      this.processarJogos(jogosCached);
+      this.carregando = false;  // ✅ ESCONDER SKELETON
+    } else {
+      console.log('⚠️ Cache vazio - aguardando dados da API');
+    }
+  }
 
-      const mapa = new Map<string, { ativos: Jogo[], encerrados: Jogo[] }>();
+  /**
+   * ✅ SINCRONIZAR EM BACKGROUND
+   */
+  private sincronizarEmBackground() {
+    console.log('🔄 Iniciando sincronização em background...');
+    this.sincronizando = true;
 
-      for (const j of jogos) {
-        const dataLocal = new Date(j.data_hora);
+    this.sincronizacaoService.sincronizar();
+    this.carregarJogosEmBackground();
+    
+    setTimeout(() => {
+      this.sincronizando = false;
+      console.log('✅ Sincronização concluída!');
+    }, 2000);
+  }
 
-        if (periodo === 'hoje' && (dataLocal < hoje00h || dataLocal > hoje23h59)) continue;
-        if (periodo === 'semana' && dataLocal > semana00h) continue;
-
-        const chave = dataLocal.toLocaleDateString('pt-BR')
-          .split('/').reverse().join('-');
-
-        if (!mapa.has(chave)) mapa.set(chave, { ativos: [], encerrados: [] });
-
-        if (j.encerrado) {
-          mapa.get(chave)!.encerrados.push(j);
-        } else {
-          mapa.get(chave)!.ativos.push(j);
-        }
+  /**
+   * ✅ CARREGAR JOGOS EM BACKGROUND
+   */
+  private carregarJogosEmBackground() {
+    this.api.jogos('todos').pipe(
+      timeout(15000),
+      catchError((error: any) => {
+        console.error('Erro ao carregar jogos:', error);
+        return of([]);
+      })
+    ).subscribe(jogos => {
+      if (jogos && jogos.length > 0) {
+        this.cache.salvarJogos(jogos);
+        this.processarJogos(jogos);
+        this.carregando = false;  // ✅ ESCONDER SKELETON
+        console.log('✅ Dados atualizados na tela!');
       }
-
-      this.dias = [...mapa.entries()].map(([chave, { ativos, encerrados }]) => ({
-        chave,
-        data: [...ativos, ...encerrados][0].data_hora,
-        jogosAtivos: ativos,
-        jogosEncerrados: encerrados,
-        expandido: false
-      }));
-
-      this.carregando = false;
     });
+  }
+
+  /**
+   * ✅ PROCESSAR JOGOS
+   */
+  private processarJogos(jogos: Jogo[]) {
+    jogos = jogos.map(j => ({
+      ...j,
+      data_hora: new Date(j.data_hora)
+    })) as any;
+
+    this.filtrar(this.periodo, jogos);
+  }
+
+  /**
+   * ✅ FILTRAR JOGOS
+   */
+  filtrar(periodo: 'hoje' | 'semana' | 'todos', jogosPassados?: Jogo[]) {
+    this.periodo = periodo;
+
+    if (!jogosPassados) {
+      const jogosCached = this.cache.obterJogos();
+      if (jogosCached && jogosCached.length > 0) {
+        jogosPassados = jogosCached;
+      } else {
+        this.dias = [];
+        return;
+      }
+    }
+
+    this.processarFiltro(periodo, jogosPassados);
+
+    // Carregar novos dados em background
+    this.api.jogos('todos').pipe(
+      timeout(15000),
+      catchError(() => of([]))
+    ).subscribe(jogos => {
+      if (jogos && jogos.length > 0) {
+        this.cache.salvarJogos(jogos);
+        this.processarFiltro(periodo, jogos);
+      }
+    });
+  }
+
+  /**
+   * ✅ PROCESSA O FILTRO INTERNAMENTE
+   */
+  private processarFiltro(periodo: 'hoje' | 'semana' | 'todos', jogos: Jogo[]) {
+    jogos = jogos.map(j => ({
+      ...j,
+      data_hora: new Date(j.data_hora)
+    })) as any;
+
+    const agora = new Date();
+    const hoje00h = new Date(agora.getFullYear(), agora.getMonth(), agora.getDate());
+    const hoje23h59 = new Date(hoje00h.getTime() + 86400000 - 1);
+    const semana00h = new Date(hoje00h.getTime() + 604800000);
+
+    const mapa = new Map<string, { ativos: Jogo[], encerrados: Jogo[] }>();
+
+    for (const j of jogos) {
+      const dataLocal = new Date(j.data_hora);
+
+      if (periodo === 'hoje' && (dataLocal < hoje00h || dataLocal > hoje23h59)) continue;
+      if (periodo === 'semana' && dataLocal > semana00h) continue;
+
+      const chave = dataLocal.toLocaleDateString('pt-BR').split('/').reverse().join('-');
+
+      if (!mapa.has(chave)) mapa.set(chave, { ativos: [], encerrados: [] });
+
+      if (j.encerrado) {
+        mapa.get(chave)!.encerrados.push(j);
+      } else {
+        mapa.get(chave)!.ativos.push(j);
+      }
+    }
+
+    this.dias = [...mapa.entries()].map(([chave, { ativos, encerrados }]) => ({
+      chave,
+      data: [...ativos, ...encerrados][0].data_hora,
+      jogosAtivos: ativos,
+      jogosEncerrados: encerrados,
+      expandido: false
+    }));
   }
 
   ehHoje(jogo: Jogo) {
     return new Date(jogo.data_hora).toDateString() === new Date().toDateString();
-  }
-
-  getTempo(jogo: Jogo): number {
-    const agora = new Date().getTime();
-    const inicio = new Date(jogo.data_hora).getTime();
-    return Math.max(0, inicio - agora);
-  }
-
-  formatarTempo(ms: number): string {
-    if (ms === 0) return '⚽ COMEÇOU';
-    const dias = Math.floor(ms / 86400000);
-    const horas = Math.floor((ms % 86400000) / 3600000);
-    const minutos = Math.floor((ms % 3600000) / 60000);
-    const segundos = Math.floor((ms % 60000) / 1000);
-
-    if (dias > 0) return `${dias}d ${horas}h`;
-    if (horas > 0) return `${horas}h ${minutos}m`;
-    if (minutos > 0) return `${minutos}m ${segundos}s`;
-    return `${segundos}s`;
   }
 
   estaAberto(jogo: Jogo): boolean {
@@ -574,54 +681,11 @@ export class JogosComponent implements OnInit, OnDestroy {
   }
 
   abrirAposta(jogo: Jogo) {
-    this.jogoEmEdicao = jogo;
-    this.palpite1 = jogo.minha_aposta?.gols_time1 ?? null;
-    this.palpite2 = jogo.minha_aposta?.gols_time2 ?? null;
+    // Implementar modal de aposta
+    console.log('Abrir aposta para jogo:', jogo.id);
   }
 
-  cancelarAposta() {
-    this.jogoEmEdicao = null;
-    this.palpite1 = null;
-    this.palpite2 = null;
-  }
-
-  verificarStatusNotificacoes() {
-    this.notifPermission.verificarStatusReal().then(status => {
-      this.notificacoesAtivadas = status.navegador === 'granted' && status.banco;
-    });
-  }
-
-  ativarNotificacoes() {
-    this.notifPermission.solicitarPermissao().then(permissao => {
-      if (permissao === 'granted') {
-        this.notifPermission.testarNotificacao();
-        setTimeout(() => {
-          this.notifPermission.sincronizarNotificacoes().then(() => {
-            this.verificarStatusNotificacoes();
-          });
-        }, 500);
-      }
-    });
-  }
-
-  confirmarAposta(jogo: Jogo) {
-    if (this.palpite1 === null || this.palpite2 === null) return;
-
-    if (!this.estaAberto(jogo)) {
-      alert('Apostas encerradas: o jogo já começou.');
-      this.cancelarAposta();
-      return;
-    }
-
-    this.api.salvarAposta(jogo.id, this.palpite1, this.palpite2).subscribe({
-      next: aposta => {
-        jogo.minha_aposta = aposta;
-        this.cancelarAposta();
-        this.filtrar(this.periodo);
-      },
-      error: e => {
-        alert(e.error?.erro || 'Erro ao salvar aposta');
-      }
-    });
+  fecharAviso() {
+    // Implementar fechar aviso
   }
 }

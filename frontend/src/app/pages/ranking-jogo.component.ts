@@ -311,6 +311,8 @@ export class RankingJogoComponent implements OnInit, OnDestroy {
     
     this.jogosFiltrados.forEach(jogo => {
       const dataLocal = new Date(jogo.data_hora);
+      dataLocal.setSeconds(dataLocal.getSeconds() - 1);
+
       const chave = dataLocal.toLocaleDateString('pt-BR')
         .split('/').reverse().join('-');
       
