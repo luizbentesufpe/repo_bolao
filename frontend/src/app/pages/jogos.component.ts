@@ -553,16 +553,18 @@ export class JogosComponent implements OnInit, OnDestroy {
   carregando = false;
   sincronizando = false;
   online = true;
-
-  // ✅ OPÇÃO B: CACHE FALLBACK
   cacheExpirado = false;
   idadeCache = 0;
+
+  // ✅ POLLING SIMPLES - APENAS PLACARES
+  onPlacareAtualizados: ((dados: any) => void) | null = null;
 
   jogoEmEdicao: Jogo | null = null;
   palpite1: number | null = null;
   palpite2: number | null = null;
 
   private intervaloAtualizacao: any;
+  private pollingInterval: any;
   private connectionSubscription: Subscription | null = null;
 
   constructor(
@@ -574,11 +576,11 @@ export class JogosComponent implements OnInit, OnDestroy {
   ) {}
 
   ngOnInit() {
-    // ✅ OPÇÃO A + B: CARREGAR COM FALLBACK
     this.carregarComFallback();
-
-    // 2️⃣ SINCRONIZAR EM BACKGROUND
     this.sincronizarEmBackground();
+
+    // ✅ POLLING A CADA 1 MINUTO (APENAS PLACARES)
+    this.iniciarPollingPlacares();
 
     this.connectionSubscription = this.connection.getStatus().subscribe((status: boolean) => {
       this.online = status;
@@ -596,15 +598,14 @@ export class JogosComponent implements OnInit, OnDestroy {
     if (this.intervaloAtualizacao) {
       clearInterval(this.intervaloAtualizacao);
     }
+    this.pararPollingPlacares();
   }
 
   /**
-   * ✅ OPÇÃO A + B: CARREGAR COM FALLBACK
-   * Mostra cache expirado + sincroniza em background
+   * ✅ CARREGAR COM FALLBACK (OPÇÃO A + B)
    */
   private carregarComFallback() {
     console.log('📦 Carregando jogos com fallback...');
-
     this.carregando = true;
 
     const jogosCached = this.cache.obterJogosComFallback();
@@ -613,20 +614,15 @@ export class JogosComponent implements OnInit, OnDestroy {
       const idade = this.cache.obterIdadeCache();
       console.log(`✅ Cache encontrado! (${idade}min atrás)`);
 
-      // Mostrar cache IMEDIATAMENTE
       this.processarFiltro(this.periodo, jogosCached);
-
-      // Esconder skeleton
       this.carregando = false;
 
-      // ✅ SE CACHE É VÁLIDO (< 30min), NÃO SINCRONIZA
       if (this.cache.isCacheValido()) {
         console.log('✅ Cache ainda é válido, sem sincronização');
         this.cacheExpirado = false;
         return;
       }
 
-      // ✅ SE CACHE EXPIROU, MOSTRAR AVISO E SINCRONIZAR
       console.log('⚠️ Cache expirado, sincronizando em background...');
       this.cacheExpirado = true;
       this.idadeCache = idade;
@@ -636,10 +632,88 @@ export class JogosComponent implements OnInit, OnDestroy {
   }
 
   /**
-   * ✅ SINCRONIZAR EM BACKGROUND
+   * ✅ POLLING A CADA 1 MINUTO - APENAS PLACARES
+   */
+  private iniciarPollingPlacares() {
+    console.log('⏱️ Iniciando polling de placares a cada 1 minuto...');
+
+    // Sincronizar agora
+    this.sincronizarPlacares();
+
+    // E a cada 60 segundos
+    this.pollingInterval = setInterval(() => {
+      console.log('🔄 Atualizando placares...');
+      this.sincronizarPlacares();
+    }, 60000); // 60 segundos = 1 minuto
+  }
+
+  /**
+   * ✅ SINCRONIZAR APENAS PLACARES
+   */
+  private sincronizarPlacares() {
+    this.api.jogos('todos').pipe(
+      timeout(15000),
+      catchError((error: any) => {
+        console.error('Erro ao atualizar placares:', error);
+        return of([]);
+      })
+    ).subscribe(jogosNovos => {
+      if (jogosNovos && jogosNovos.length > 0) {
+        // ✅ ATUALIZAR APENAS OS PLACARES
+        jogosNovos.forEach(jogoNovo => {
+          // Procurar em dias.jogosAtivos
+          for (let dia of this.dias) {
+            const jogo = dia.jogosAtivos.find(j => j.id === jogoNovo.id);
+
+            if (jogo) {
+              // ✅ ATUALIZAR APENAS PLACARES
+              jogo.gols_time1 = jogoNovo.gols_time1;
+              jogo.gols_time2 = jogoNovo.gols_time2;
+              jogo.encerrado = jogoNovo.encerrado;
+              jogo.ao_vivo = jogoNovo.ao_vivo;
+
+              // ✅ MANTER PALPITES DO USUÁRIO INTACTOS
+              // (não mexer em jogo.minha_aposta)
+            }
+          }
+
+          // Procurar em encerrados também
+          const jogoEncerrado = this.jogosEncerrados.find(j => j.id === jogoNovo.id);
+          if (jogoEncerrado) {
+            jogoEncerrado.gols_time1 = jogoNovo.gols_time1;
+            jogoEncerrado.gols_time2 = jogoNovo.gols_time2;
+            jogoEncerrado.encerrado = jogoNovo.encerrado;
+          }
+        });
+
+        console.log('✅ Placares atualizados!');
+
+        // ✅ CHAMAR onChange
+        if (this.onPlacareAtualizados) {
+          this.onPlacareAtualizados({
+            timestamp: new Date(),
+            totalJogos: jogosNovos.length
+          });
+        }
+      }
+    });
+  }
+
+  /**
+   * ✅ PARAR POLLING
+   */
+  private pararPollingPlacares() {
+    if (this.pollingInterval) {
+      clearInterval(this.pollingInterval);
+      console.log('⏹️ Polling de placares parado');
+    }
+  }
+
+  /**
+   * ✅ SINCRONIZAR INICIAL (TODOS OS DADOS)
    */
   private sincronizarEmBackground() {
-    console.log('🔄 Iniciando sincronização em background...');
+    console.log('🔄 Iniciando sincronização inicial...');
     this.sincronizando = true;
 
     this.sincronizacaoService.sincronizar();
@@ -654,12 +728,8 @@ export class JogosComponent implements OnInit, OnDestroy {
       if (jogos && jogos.length > 0) {
         this.cache.salvarJogos(jogos);
         this.processarFiltro(this.periodo, jogos);
-
-        // ✅ ESCONDER AVISO DE CACHE EXPIRADO
         this.cacheExpirado = false;
-
         this.carregando = false;
-        console.log('✅ Dados atualizados na tela!');
       }
       this.sincronizando = false;
     });
@@ -715,7 +785,6 @@ export class JogosComponent implements OnInit, OnDestroy {
       const chaveAnterior = dataAnterior.toLocaleDateString('pt-BR').split('/').reverse().join('-');
       const chaveReal = dataReal.toLocaleDateString('pt-BR').split('/').reverse().join('-');
 
-      // Verificar se o jogo passa no filtro de período
       let passaFiltro = false;
       if (periodo === 'todos') {
         passaFiltro = true;
@@ -728,18 +797,15 @@ export class JogosComponent implements OnInit, OnDestroy {
 
       if (!passaFiltro) continue;
 
-      // Encerrados vão para a lista única
       if (j.encerrado) {
         encerrados.push(j);
         continue;
       }
 
-      // Ativos agrupados por dia
       const chave = chaveAnterior;
       if (!mapa.has(chave)) mapa.set(chave, { ativos: [] });
       mapa.get(chave)!.ativos.push(j);
 
-      // Meia-noite aparece também no dia real (só para hoje)
       if (ehMeiaNoite && periodo === 'hoje' && chaveReal !== chaveAnterior && dataReal >= hoje00h && dataReal <= hoje23h59) {
         if (!mapa.has(chaveReal)) mapa.set(chaveReal, { ativos: [] });
         mapa.get(chaveReal)!.ativos.push(j);
@@ -747,7 +813,6 @@ export class JogosComponent implements OnInit, OnDestroy {
     }
 
     this.jogosEncerrados = encerrados;
-
     this.dias = [...mapa.entries()].map(([chave, { ativos }]) => ({
       chave,
       data: ativos[0].data_hora,

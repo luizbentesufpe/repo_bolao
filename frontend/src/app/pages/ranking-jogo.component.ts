@@ -224,6 +224,89 @@ function calcularPontosPrevisto(aposta: any, placarAtual: { gols_time1: number |
   styles: [`
     .jogo-card {
       min-height: 120px;
+      background: white;
+      border: 1px solid var(--linha);
+      border-radius: 8px;
+      padding: 12px;
+      margin-bottom: 12px;
+      display: grid;
+      grid-template-columns: 1fr auto 1fr auto;
+      grid-template-rows: auto auto;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .jogo-time {
+      display: flex;
+      align-items: center;
+      font-weight: 700;
+      font-size: 13px;
+      color: var(--tinta);
+      word-break: break-word;
+    }
+
+    .jogo-time.dir {
+      justify-self: end;
+    }
+
+    .placar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      justify-content: center;
+      grid-column: 2;
+      grid-row: 1;
+    }
+
+    .digito {
+      font-size: 26px;
+      font-weight: 700;
+      color: var(--amarelo);
+      min-width: 32px;
+      text-align: center;
+    }
+
+    .digito.vazio {
+      color: #bbb;
+    }
+
+    .x {
+      font-weight: 700;
+      font-size: 18px;
+      color: var(--tinta-fraca);
+    }
+
+    .jogo-meta {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      color: var(--tinta-fraca);
+      grid-column: 1 / -1;
+      grid-row: 2;
+    }
+
+
+    @media (max-width: 480px) {
+      .jogo-card {
+        grid-template-columns: auto 1fr;
+        padding: 8px;
+      }
+
+      .jogo-time {
+        font-size: 11px;
+      }
+
+      .digito {
+        font-size: 20px;
+        min-width: 24px;
+      }
+
+      .filtros button {
+        font-size: 12px;
+        padding: 6px 12px;
+      }
     }
   `]
 })
@@ -238,6 +321,10 @@ export class RankingJogoComponent implements OnInit, OnDestroy {
   usuariosMeusPalpites: { [key: number]: any } = {};
   jogoComPalpitesAberto: number | null = null;
 
+  // ✅ POLLING DE PLACARES
+  private pollingInterval: any;
+  onPlacareAtualizados: ((dados: any) => void) | null = null;
+
   constructor(private api: ApiService, private sincronizacaoService: SincronizacaoService, auth: AuthService) {
     this.meuEmail = auth.usuario()?.email ?? '';
   }
@@ -246,9 +333,15 @@ export class RankingJogoComponent implements OnInit, OnDestroy {
     this.sincronizacaoService.sincronizar();
     this.carregarDados();
     this.atualizarLista();
+
+    // ✅ POLLING A CADA 1 MINUTO (APENAS PLACARES)
+    this.iniciarPollingPlacares();
   }
 
-  ngOnDestroy() {}
+  ngOnDestroy() {
+    // ✅ PARAR POLLING
+    this.pararPollingPlacares();
+  }
 
   // ✅ FUNÇÃO PARA CALCULAR PONTOS PREVISTO
   calcularPrevisto(aposta: any): number {
@@ -257,6 +350,69 @@ export class RankingJogoComponent implements OnInit, OnDestroy {
       gols_time1: this.detalhe.jogo.gols_time1,
       gols_time2: this.detalhe.jogo.gols_time2
     });
+  }
+
+  /**
+   * ✅ POLLING A CADA 1 MINUTO - APENAS PLACARES
+   */
+  private iniciarPollingPlacares() {
+    console.log('⏱️ Iniciando polling de placares (ranking jogo)...');
+
+    this.sincronizarPlacares();
+
+    this.pollingInterval = setInterval(() => {
+      console.log('🔄 Atualizando placares (ranking jogo)...');
+      this.sincronizarPlacares();
+    }, 60000); // 60 segundos = 1 minuto
+  }
+
+  /**
+   * ✅ SINCRONIZAR APENAS PLACARES
+   */
+  private sincronizarPlacares() {
+    this.api.jogos('todos').subscribe((jogosNovos: Jogo[]) => {
+      if (jogosNovos && jogosNovos.length > 0) {
+        // ✅ ATUALIZAR APENAS PLACARES
+        jogosNovos.forEach(jogoNovo => {
+          const jogoAtual = this.jogos.find(j => j.id === jogoNovo.id);
+
+          if (jogoAtual) {
+            jogoAtual.gols_time1 = jogoNovo.gols_time1;
+            jogoAtual.gols_time2 = jogoNovo.gols_time2;
+            jogoAtual.encerrado = jogoNovo.encerrado;
+            jogoAtual.ao_vivo = jogoNovo.ao_vivo;
+
+            // ✅ ATUALIZAR DETALHE SE ESTIVER ABERTO
+            if (this.detalhe && this.detalhe.jogo.id === jogoNovo.id) {
+              this.detalhe.jogo.gols_time1 = jogoNovo.gols_time1;
+              this.detalhe.jogo.gols_time2 = jogoNovo.gols_time2;
+              this.detalhe.jogo.encerrado = jogoNovo.encerrado;
+              this.detalhe.jogo.ao_vivo = jogoNovo.ao_vivo;
+            }
+          }
+        });
+
+        console.log('✅ Placares atualizados (ranking jogo)!');
+
+        // ✅ CHAMAR onChange
+        if (this.onPlacareAtualizados) {
+          this.onPlacareAtualizados({
+            timestamp: new Date(),
+            totalJogos: jogosNovos.length
+          });
+        }
+      }
+    });
+  }
+
+  /**
+   * ✅ PARAR POLLING
+   */
+  private pararPollingPlacares() {
+    if (this.pollingInterval) {
+      clearInterval(this.pollingInterval);
+      console.log('⏹️ Polling de placares parado (ranking jogo)');
+    }
   }
 
   atualizarLista() {
@@ -367,4 +523,4 @@ export class RankingJogoComponent implements OnInit, OnDestroy {
       this.detalhe = detalhe;
     });
   }
-} 
+}
