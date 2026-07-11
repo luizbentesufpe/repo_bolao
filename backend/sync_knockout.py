@@ -73,6 +73,7 @@ def seed_knockout_matches(app=None, verbose=True):
     """Popula todos os jogos de mata-mata no banco de dados"""
     if app is None:
         from app import app as flask_app
+
         app = flask_app
 
     with app.app_context():
@@ -169,14 +170,20 @@ def seed_knockout_matches(app=None, verbose=True):
                         # Atualizar gols se disponível
                         if match.get("score"):
                             score = match["score"]
-                            if score.get("fullTime"):
-                                jogo_existente.gols_time1 = score["fullTime"].get(
-                                    "home"
-                                )
-                                jogo_existente.gols_time2 = score["fullTime"].get(
-                                    "away"
-                                )
+                            duration = score.get("duration", "REGULAR")
 
+                            if duration == "PENALTY_SHOOTOUT":
+                                gols1 = score.get("regularTime", {}).get("home")
+                                gols2 = score.get("regularTime", {}).get("away")
+                            elif score.get("fullTime"):
+                                gols1 = score["fullTime"].get("home")
+                                gols2 = score["fullTime"].get("away")
+                            else:
+                                gols1 = gols2 = None
+
+                            if gols1 is not None and gols2 is not None:
+                                jogo_existente.gols_time1 = gols1
+                                jogo_existente.gols_time2 = gols2
                         atualizados += 1
                         if verbose:
                             print(
@@ -198,10 +205,21 @@ def seed_knockout_matches(app=None, verbose=True):
                         # Adicionar gols se disponível
                         if match.get("score"):
                             score = match["score"]
-                            if score.get("fullTime"):
-                                novo_jogo.gols_time1 = score["fullTime"].get("home")
-                                novo_jogo.gols_time2 = score["fullTime"].get("away")
+                            duration = score.get("duration", "REGULAR")
 
+                            if duration == "PENALTY_SHOOTOUT":
+                                gols1 = score.get("regularTime", {}).get("home")
+                                gols2 = score.get("regularTime", {}).get("away")
+                            elif score.get("fullTime"):
+                                gols1 = score["fullTime"].get("home")
+                                gols2 = score["fullTime"].get("away")
+                            else:
+                                gols1 = gols2 = None
+
+                            if gols1 is not None:
+                                novo_jogo.gols_time1 = gols1
+                            if gols2 is not None:
+                                novo_jogo.gols_time2 = gols2
                         db.session.add(novo_jogo)
                         criados += 1
 
