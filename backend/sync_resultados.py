@@ -87,7 +87,7 @@ ESPN_TRADUCOES = {
     "United States": "Estados Unidos",
     "Paraguay": "Paraguai",
     "Australia": "Austrália",
-    "Türkiye": "Turquia",   # ESPN usa Türkiye
+    "Türkiye": "Turquia",  # ESPN usa Türkiye
     "Turkey": "Turquia",
     "Germany": "Alemanha",
     "Curaçao": "Curaçau",
@@ -167,7 +167,10 @@ def buscar_placar_espn(verbose=False):
             placares[(home_pt, away_pt)] = (gols_home, gols_away)
 
             if verbose:
-                print(f"📡 ESPN: {home_pt} {gols_home}×{gols_away} {away_pt} [{state}]", flush=True)
+                print(
+                    f"📡 ESPN: {home_pt} {gols_home}×{gols_away} {away_pt} [{state}]",
+                    flush=True,
+                )
 
         return placares
 
@@ -181,6 +184,7 @@ def sincronizar_resultados(app=None, verbose=True, status_filter="IN_PLAY"):
     """Sincroniza resultados com a API football-data.org + fallback ESPN"""
     if app is None:
         from app import app as flask_app
+
         app = flask_app
 
     with app.app_context():
@@ -231,11 +235,29 @@ def sincronizar_resultados(app=None, verbose=True, status_filter="IN_PLAY"):
                 status_antigo = jogo.status_api
                 jogo.status_api = match["status"]
 
-                if match["status"] in ["FINISHED", "LIVE", "IN_PLAY", "PAUSED", "SUSPENDED"]:
+                if match["status"] in [
+                    "FINISHED",
+                    "LIVE",
+                    "IN_PLAY",
+                    "PAUSED",
+                    "SUSPENDED",
+                ]:
                     score = match.get("score", {})
 
-                    gols_time1 = score.get("fullTime", {}).get("home")
-                    gols_time2 = score.get("fullTime", {}).get("away")
+                    duration = score.get("duration", "REGULAR")
+
+                    # ✅ SE FOR PÊNALTIS, USA regularTime (tempo normal)
+                    if duration == "PENALTY_SHOOTOUT":
+                        gols_time1 = score.get("regularTime", {}).get("home")
+                        gols_time2 = score.get("regularTime", {}).get("away")
+                        print(
+                            f"⚠️  {time1_nome} vs {time2_nome} foi para pênaltis, usando placar do tempo normal",
+                            flush=True,
+                        )
+                    else:
+                        # ✅ SENÃO, USA fullTime (tempo normal ou prorrogação)
+                        gols_time1 = score.get("fullTime", {}).get("home")
+                        gols_time2 = score.get("fullTime", {}).get("away")
 
                     if gols_time1 is None or gols_time2 is None:
                         gols_time1 = score.get("halfTime", {}).get("home") or gols_time1
@@ -247,7 +269,10 @@ def sincronizar_resultados(app=None, verbose=True, status_filter="IN_PLAY"):
                         if espn:
                             gols_time1, gols_time2 = espn
                             if verbose:
-                                print(f"📡 ESPN fallback usado: {time1_nome} {gols_time1}×{gols_time2} {time2_nome}", flush=True)
+                                print(
+                                    f"📡 ESPN fallback usado: {time1_nome} {gols_time1}×{gols_time2} {time2_nome}",
+                                    flush=True,
+                                )
 
                     if gols_time1 is not None and gols_time2 is not None:
                         # ✅ FIX: só atualiza se o novo placar for >= ao salvo (nunca regride)
@@ -256,6 +281,7 @@ def sincronizar_resultados(app=None, verbose=True, status_filter="IN_PLAY"):
 
                         if (
                             jogo.gols_time1 is None
+                            or duration == "PENALTY_SHOOTOUT"
                             or gols_time1 >= gols_time1_atual
                             or gols_time2 >= gols_time2_atual
                         ):
@@ -287,7 +313,9 @@ def sincronizar_resultados(app=None, verbose=True, status_filter="IN_PLAY"):
             if verbose:
                 print(f"🎉 {atualizados} jogos atualizados", flush=True)
                 if nao_encontrados:
-                    print(f"⚠️  Não encontrados: {', '.join(nao_encontrados)}", flush=True)
+                    print(
+                        f"⚠️  Não encontrados: {', '.join(nao_encontrados)}", flush=True
+                    )
             else:
                 if atualizados > 0:
                     print(
@@ -300,6 +328,7 @@ def sincronizar_resultados(app=None, verbose=True, status_filter="IN_PLAY"):
         except Exception as e:
             print(f"❌ Erro na sincronização: {e}", flush=True)
             import traceback
+
             traceback.print_exc()
             return False
 
